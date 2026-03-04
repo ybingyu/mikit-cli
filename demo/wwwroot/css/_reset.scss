@@ -1,0 +1,233 @@
+@charset 'utf-8';
+// 高清图片路径
+//$imgPath: 'http://wb.y.bindyy.cn:8080/img/txt/';
+$imgPath: 'https://image.99.com/my/activity/2025/12/wb/txt/'; // todo
+
+/* CSS Document */
+body,
+div,
+dl,
+dt,
+dd,
+ul,
+ol,
+li,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+pre,
+form,
+fieldset,
+input,
+textarea,
+p,
+blockquote,
+th,
+td {
+    margin: 0;
+    padding: 0;
+}
+
+ol,
+ul,
+dl {
+    list-style: none;
+}
+
+img {
+    border: none;
+}
+
+table {
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+input,
+textarea,
+select {
+    font: 12px 'Microsoft YaHei', simsun, tahoma;
+    outline: none;
+}
+
+a {
+    text-decoration: none;
+    color: #fff;
+    outline: none;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-size: 100%;
+    font-weight: normal;
+}
+
+input:active {
+    outline: none;
+}
+
+.clearfix:after {
+    display: block;
+    height: 0;
+    font-size: 0;
+    visibility: hidden;
+    clear: both;
+    content: '';
+}
+
+.clearfix {
+    zoom: 1;
+}
+
+.clear {
+    clear: both;
+}
+
+.hidden {
+    line-height: 99999px;
+    overflow: hidden;
+}
+
+.relative {
+    position: relative;
+}
+
+.fl {
+    float: left;
+}
+
+.fr {
+    float: right;
+}
+
+
+[v-cloak] {
+    display: none;
+}
+
+* {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    box-sizing: border-box;
+}
+
+body {
+    background: #63483f;
+    font-family: 'Microsoft YaHei';
+}
+
+
+@font-face {
+    font-family: "Alibaba-PuHuiTi-Regular";
+    src: url("../font/Alibaba-PuHuiTi-Regular.woff2") format("woff2"),
+        url("../font/Alibaba-PuHuiTi-Regular.woff") format("woff"),
+        url("../font/Alibaba-PuHuiTi-Regular.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "Alibaba-PuHuiTi-Bold";
+    src: url("../font/Alibaba-PuHuiTi-Bold.woff2") format("woff2"),
+        url("../font/Alibaba-PuHuiTi-Bold.woff") format("woff"),
+        url("../font/Alibaba-PuHuiTi-Bold.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "Alibaba-PuHuiTi-Medium";
+    src: url("../font/Alibaba-PuHuiTi-Medium.woff2") format("woff2"),
+        url("../font/Alibaba-PuHuiTi-Medium.woff") format("woff"),
+        url("../font/Alibaba-PuHuiTi-Medium.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "Alibaba-PuHuiTi-Heavy";
+    src: url("../font/Alibaba-PuHuiTi-Heavy.woff2") format("woff2"),
+        url("../font/Alibaba-PuHuiTi-Heavy.woff") format("woff"),
+        url("../font/Alibaba-PuHuiTi-Heavy.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "dzjht";
+    src: url("../font/9139.woff2") format("woff2"),
+        url("../font/9139.woff") format("woff"),
+        url("../font/9139.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "SourceHanSansCN-Regular";
+    src: url("../font/SourceHanSansCN-Regular.woff2") format("woff2"),
+        url("../font/SourceHanSansCN-Regular.woff") format("woff"),
+        url("../font/SourceHanSansCN-Regular.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "SourceHanSansCN-Heavy";
+    src: url("../font/SourceHanSansCN-Heavy.woff2") format("woff2"),
+        url("../font/SourceHanSansCN-Heavy.woff") format("woff"),
+        url("../font/SourceHanSansCN-Heavy.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+
+@font-face {
+    font-family: "SourceHanSansCN-Normal";
+    src: url("../font/SourceHanSansCN-Normal.woff2") format("woff2"),
+        url("../font/SourceHanSansCN-Normal.woff") format("woff"),
+        url("../font/SourceHanSansCN-Normal.ttf") format("truetype");
+    font-style: normal;
+    font-weight: normal;
+}
+.font-dzjht {
+    font-family: "dzjht";
+}
+
+.font-Alibaba-PuHuiTi-Heavy {
+    font-family: "Alibaba-PuHuiTi-Heavy";
+}
+
+.font-Alibaba-PuHuiTi-Regular {
+    font-family: "Alibaba-PuHuiTi-Regular";
+}
+
+.font-Alibaba-PuHuiTi-Bold {
+    font-family: "Alibaba-PuHuiTi-Bold";
+}
+
+.font-Alibaba-PuHuiTi-Medium {
+    font-family: "Alibaba-PuHuiTi-Medium";
+}
+
+.font-SourceHanSansCN-Regular {
+    font-family: "SourceHanSansCN-Regular";
+}
+
+.font-SourceHanSansCN-Heavy {
+    font-family: "SourceHanSansCN-Heavy";
+}
+.font-SourceHanSansCN-Normal {
+    font-family: "SourceHanSansCN-Normal";
+}
+br {
+    font-family: 'Microsoft YaHei UI';
+}

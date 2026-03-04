@@ -38,11 +38,13 @@ program
   .description('Start local development server')
   .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
+  .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
   .action((options) => {
     const server = require('../lib/server');
     server.start({
       port: options.port,
-      root: options.root
+      root: options.root,
+      domain: options.domain
     });
   });
 
@@ -76,11 +78,13 @@ program
   .description('Start local development server (alias for start)')
   .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
+  .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
   .action((options) => {
     const server = require('../lib/server');
     server.start({
       port: options.port,
-      root: options.root
+      root: options.root,
+      domain: options.domain
     });
   });
 

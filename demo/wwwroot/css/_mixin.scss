@@ -1,0 +1,109 @@
+/*display-inline*/
+@mixin display-inline {
+    display: inline-block;
+    *display: inline;
+    *zoom: 1;
+}
+
+/*margin-left-half*/
+@mixin margin-left-half($width) {
+    left: 50%;
+    margin-left: -($width/2);
+}
+
+/*圆角*/
+@mixin border-radius($radius...) {
+    -webkit-border-radius: $radius;
+    border-radius: $radius;
+}
+
+//transition
+@mixin transition($transition...) {
+    -webkit-transition: $transition;
+    transition: $transition;
+}//animation
+@mixin animation($animation...) {
+    -webkit-animation: $animation;
+    animation: $animation;
+}
+
+//opacity
+@mixin opacity($opacity) {
+    opacity: $opacity;
+    $o: ($opacity * 100);
+    filter: Alpha(Opacity=$o);
+}
+
+//transform
+@mixin transform($transforms) {
+    -webkit-transform: $transforms;
+    transform: $transforms;
+}
+
+
+@mixin fontShadow($dur: 1px, $size: 5px, $color: #5a1100) {
+    -webkit-filter: drop-shadow(0 $dur $size $color);
+}
+
+// 文字溢出省略，仅webkit支持多
+@mixin ellipsis($lines) {
+    @if ($lines == 1) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    } @else {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: $lines;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        word-break: break-all;
+    }
+}
+
+//三角形
+@mixin triangle($direction: down, $size: 5px, $color: #F96001) {
+    width: 0;
+    height: 0;
+    @if ($direction == left) {
+        border-top: $size solid transparent;
+        border-bottom: $size solid transparent;
+        border-right: $size solid $color;
+    } @else if ($direction == right) {
+        border-top: $size solid transparent;
+        border-bottom: $size solid transparent;
+        border-left: $size solid $color;
+    } @else if ($direction == down) {
+        border-left: $size solid transparent;
+        border-right: $size solid transparent;
+        border-top: $size solid $color;
+    } @else {
+        border-left: $size solid transparent;
+        border-right: $size solid transparent;
+        border-bottom: $size solid $color;
+    }
+}
+
+//鼠标经过提亮
+@mixin btnLight() {
+    -webkit-filter: brightness(1.1);
+    filter: brightness(1.1);
+}
+
+//置灰
+@mixin grayStyle() {
+    -webkit-filter: grayscale(100%);
+    filter: grayscale(100%);
+}
+
+
+//字体渐变
+@mixin fontLinear() {
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+@mixin filter($s) {
+	-webkit-filter: $s;
+	filter:$s;
+}

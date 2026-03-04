@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit">
+    <!--#include virtual="include/_meta.shtml"-->
+    <!--终端适配-->
+    <meta name="applicable-device" content="pc">
+    <meta http-equiv="Cache-Control" content="no-transform"/>
+    <meta http-equiv="Cache-Control" content="no-siteapp"/>
+    <!--/终端适配-->
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+
+<div class="container" id="app" :class="{ani:isAni}">
+    <header class="activity-header">
+        <h1 class="logo" id="logo">
+            <script>setLogo();</script>
+        </h1>
+        <h2 class="title">品牌日网吧专属特权</h2>
+        <a href="javascript:;" class="rule-btn" @click="popHandler('popRules')"><span>活动规则</span></a>
+        <div class="user-info">
+            <p>亲爱的<span>我是七个半字符，</span>快领取您的专属奖励吧！</p>
+            <a href="javascript:;"
+                                                                      class="btn-record"><span>获奖记录</span></a>
+        </div>
+    </header>
+    <main class="activity-main">
+        <section class="mod daily-login">
+            <div class="login-title">登录惊喜</div>
+            <!-- <div class="login-desc"><p><span>欧气附体！</span><b>马年幻兽</b><span>轻松得</span></p></div> -->
+
+            <ul class="award-section" :class="[user.user_type==1?'new':'old']">
+                <!--新手6个图标 老手5个图标-->
+                <li class="reward-item" v-for="(item,index) in rewardsList[user.user_type]" :key="index"
+                    :class="[item.cls,'reward-item-' + (index+1),{'reward-item-common':index>=1,'reward-item-big':index==0,active:current==index}]">
+                    <div class="pic"><img :src="picURL+item.pic+'.png'" alt=""></div>
+                    <p class="name" v-html="item.name"></p>
+                </li>
+            </ul>
+            <p class="progress">已领<b>1/7</b></p>
+            <a href="javascript:;" class="btn btn-default btn-luck" v-if="btnLuckStatus==0"
+               @click="move"><span>开启好运</span></a>
+            <a href="javascript:;" class="btn btn-default btn-luck ed" v-else-if="btnLuckStatus==1"
+               @click="btnLuckStatus++"><span>今日已开启</span></a>
+            <a href="javascript:;" class="btn btn-default btn-luck up" v-else><span>已达上限</span></a>
+        </section>
+        <section class="mod special-sale">
+            <div class="special-title">特惠专享</div>
+            <div class="special-desc"><p><span>臻品礼包低至</span> <b>1折</b> <span>道具四选一</span></p></div>
+            <ul class="special-section">
+                <li class="special-item" v-for="(item,index) in goodsList" :key="index">
+                    <div class="pic"><img :src="picURL+item.pic+'.png'" alt="">
+                        <p class="count" v-if="item.count" :class="['count-'+item.count]">X{{item.count}}</p></div>
+                    <p class="name" v-html="item.name"></p>
+                </li>
+            </ul>
+            <p class="tips">*单个账号仅限购买一次</p>
+            <a href="javascript:;" class="btn btn-default btn-discount" v-if="btnDiscountStatus==0"
+               @click="btnDiscountStatus++"><span>1.9元</span><b>点击抢购</b></a>
+            <a href="javascript:;" v-else class="btn btn-default btn-discount ed"><span>已购买</span></a>
+        </section>
+    </main>
+    <!--#include virtual="include/_pop.shtml"-->
+</div>
+<!--#include virtual="include/_js.shtml"-->
+</body>
+</html>

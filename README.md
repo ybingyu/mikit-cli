@@ -28,10 +28,12 @@ mikit start [选项]
 **选项：**
 - `-p, --port <port>`: 服务器端口（默认：8080）
 - `-r, --root <root>`: 根目录（默认：.）
+- `-d, --domain <domain>`: 域名（默认：y.bindyy.cn）
 
 **示例：**
 ```bash
 mikit start --port 8084
+mikit start --domain test.example.com
 ```
 
 ### 2. 构建项目
@@ -72,6 +74,19 @@ Mikit-CLI 提供三种构建命令，适用于不同场景：
 - 文件压缩（HTML、CSS、JS）
 - CSS 自动前缀（通过 autoprefixer）
 - 智能文件过滤（跳过 `_` 前缀文件）
+
+### 5. 子域名匹配机制
+- 支持通过子域名访问不同项目
+- 自动为项目生成唯一的子域名
+- 可通过 `--domain` 选项自定义域名
+
+**使用方法：**
+1. 在本地 hosts 文件中添加配置：`127.0.0.1 *.y.bindyy.cn`（或您自定义的域名）
+2. 启动服务器后，可以通过 `http://项目ID.y.bindyy.cn:端口` 访问项目
+
+**示例：**
+- 项目目录：`test-mikit-cli`
+- 访问 URL：`http://test-mikit-cli.y.bindyy.cn:8080`
 
 ## 项目结构
 

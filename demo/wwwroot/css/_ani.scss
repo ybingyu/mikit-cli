@@ -1,0 +1,65 @@
+@-webkit-keyframes mask {
+
+    from,
+    to {
+        -webkit-mask: url(https://wjdown.99.com/games/my/img/ani/mask/mask_09b54d2e-sm.png) center no-repeat;
+    }
+
+    0% {
+        -webkit-mask-size: 35%;
+        opacity: 1
+    }
+
+    100% {
+        -webkit-mask-size: 532%;
+        opacity: 1
+    }
+}
+
+@keyframes mask {
+
+    from,
+    to {
+        -webkit-mask: url(https://wjdown.99.com/games/my/img/ani/mask/mask_09b54d2e-sm.png) center no-repeat;
+    }
+
+    0% {
+        -webkit-mask-size: 35%;
+        opacity: 1
+    }
+
+    100% {
+        -webkit-mask-size: 532%;
+        opacity: 1
+    }
+}
+
+@-webkit-keyframes rotateDialog {
+    from {
+        -webkit-transform: rotate(-2deg);
+    }
+    to {
+        -webkit-transform: rotate(2deg);
+    }
+}
+
+@keyframes rotateDialog {
+    from {
+        transform: rotate(-2deg);
+    }
+    to {
+        transform: rotate(2deg);
+    }
+}
+
+.container {
+    opacity: 0;
+    &.ani {
+        opacity: 1;
+        @include transition(all 0.3s);
+        -webkit-mask-size: 4000% 100%;
+        mask-size: 4000% 100%;
+        -webkit-animation: mask .5s linear;
+        animation: mask .5s linear;
+    }
+}

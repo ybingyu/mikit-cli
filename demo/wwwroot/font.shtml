@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>字体</title>
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+<!--程序的动态字体-->
+<div class="font-Alibaba-PuHuiTi-Bold">1234567890</div>
+<div class="font-SourceHanSansCN-Heavy">1234567890 点击抢购1.9元已购买已达上限开启好运今日已开启 </div>
+<!--奖励不同，新手和老玩家的都要贴一遍↓-->
+<!--#include virtual="include/_fontappNew.shtml"-->
+<!--#include virtual="include/_fontappOld.shtml"-->
+</body>
+</html>
