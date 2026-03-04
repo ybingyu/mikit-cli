@@ -39,12 +39,24 @@ program
   .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
   .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
+  .option('-v, --virtual <virtual>', 'Virtual directory mapping (format: /path:/physical/path)', (value, previous) => {
+    const mappings = previous || {};
+    // 查找第一个冒号的位置，处理Windows路径中的冒号
+    const colonIndex = value.indexOf(':');
+    if (colonIndex > 0) {
+      const path = value.substring(0, colonIndex);
+      const physicalPath = value.substring(colonIndex + 1);
+      mappings[path] = physicalPath;
+    }
+    return mappings;
+  }, {})
   .action((options) => {
     const server = require('../lib/server');
     server.start({
       port: options.port,
       root: options.root,
-      domain: options.domain
+      domain: options.domain,
+      virtual: options.virtual
     });
   });
 
@@ -79,12 +91,24 @@ program
   .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
   .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
+  .option('-v, --virtual <virtual>', 'Virtual directory mapping (format: /path:/physical/path)', (value, previous) => {
+    const mappings = previous || {};
+    // 查找第一个冒号的位置，处理Windows路径中的冒号
+    const colonIndex = value.indexOf(':');
+    if (colonIndex > 0) {
+      const path = value.substring(0, colonIndex);
+      const physicalPath = value.substring(colonIndex + 1);
+      mappings[path] = physicalPath;
+    }
+    return mappings;
+  }, {})
   .action((options) => {
     const server = require('../lib/server');
     server.start({
       port: options.port,
       root: options.root,
-      domain: options.domain
+      domain: options.domain,
+      virtual: options.virtual
     });
   });
 

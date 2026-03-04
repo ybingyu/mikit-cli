@@ -29,11 +29,13 @@ mikit start [选项]
 - `-p, --port <port>`: 服务器端口（默认：8080）
 - `-r, --root <root>`: 根目录（默认：.）
 - `-d, --domain <domain>`: 域名（默认：y.bindyy.cn）
+- `-v, --virtual <virtual>`: 虚拟目录映射（格式：/path:/physical/path）
 
 **示例：**
 ```bash
 mikit start --port 8084
 mikit start --domain test.example.com
+mikit start --virtual /demo:d:\ProgramFiles\Mikit
 ```
 
 ### 2. 构建项目
