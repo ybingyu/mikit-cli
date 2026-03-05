@@ -19,10 +19,10 @@
         <h1 class="logo" id="logo">
             <script>setLogo();</script>
         </h1>
-        <h2 class="title">品牌日网吧专属特权</h2>
+        <h2 class="title">品牌网吧专属特权</h2>
         <a href="javascript:;" class="rule-btn" @click="popHandler('popRules')"><span>活动规则</span></a>
         <div class="user-info">
-            <p>亲爱的<span>我是七个半字符，</span>快领取您的专属奖励吧！</p>
+            <p>亲爱的<span>我是12个半字符，</span>快领取1您的专属奖励吧！</p>
             <a href="javascript:;"
                                                                       class="btn-record"><span>获奖记录</span></a>
         </div>

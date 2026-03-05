@@ -114,7 +114,7 @@ const app = new Vue({
 
         this.user.user_type = Number(myPublic.getQueryString('o')) || 0
         console.log(this.user.user_type ? '新玩家' : '老玩家')
-        console.log('Updated JS file')
+        // console.log('Updated JS file')
         /*test:end*/
 
         setTimeout(() => { this.isAni = true }, 100)

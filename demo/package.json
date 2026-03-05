@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start": "mikit start --port 8084 --domain y.bindyy.cn",
+    "start": "mikit start --port 8086 --domain y.bindyy.cn",
     "build": "mikit build",
     "build:minify": "mikit build --min",
     "build:minify-css": "mikit build --mincss"
