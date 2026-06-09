@@ -38,6 +38,32 @@ mikit start --domain test.example.com
 mikit start --virtual /demo:d:\ProgramFiles\Mikit
 ```
 
+**同端口多项目示例：**
+如果一个目录下有多个 MiKit 项目，每个项目都有自己的 `wwwroot` 目录，可以在这些项目的上级目录启动一个服务：
+```bash
+mikit start --port 8080 --root .
+```
+
+目录示例：
+```text
+workspace/
+├── project-a/
+│   └── wwwroot/
+├── project-b/
+│   └── wwwroot/
+└── project-c/
+    └── wwwroot/
+```
+
+启动后可使用同一个端口，通过不同子域名访问不同项目：
+```text
+http://project-a.y.bindyy.cn:8080
+http://project-b.y.bindyy.cn:8080
+http://project-c.y.bindyy.cn:8080
+```
+
+如果当前目录本身就是一个项目（当前目录下直接存在 `wwwroot`），则只加载当前项目。
+
 ### 2. 构建项目
 Mikit-CLI 提供三种构建命令，适用于不同场景：
 
@@ -79,16 +105,30 @@ Mikit-CLI 提供三种构建命令，适用于不同场景：
 
 ### 5. 子域名匹配机制
 - 支持通过子域名访问不同项目
-- 自动为项目生成唯一的子域名
+- 默认使用项目文件夹名称生成子域名，例如 `project-a` 对应 `project-a.y.bindyy.cn`
+- 多项目模式下，多个项目共用同一个服务端口
 - 可通过 `--domain` 选项自定义域名
 
 **使用方法：**
-1. 在本地 hosts 文件中添加配置：`127.0.0.1 *.y.bindyy.cn`（或您自定义的域名）
-2. 启动服务器后，可以通过 `http://项目ID.y.bindyy.cn:端口` 访问项目
+1. 确保访问域名能解析到本机 `127.0.0.1`。
+   - 如果有通配 DNS，可以配置 `*.y.bindyy.cn -> 127.0.0.1`。
+   - 如果使用 hosts 文件，需要逐个添加项目子域名，例如：`127.0.0.1 project-a.y.bindyy.cn`。
+2. 在项目上级目录启动服务器：`mikit start --port 8080 --root .`
+3. 通过 `http://项目文件夹名.y.bindyy.cn:端口` 访问项目。
 
 **示例：**
 - 项目目录：`test-mikit-cli`
 - 访问 URL：`http://test-mikit-cli.y.bindyy.cn:8080`
+
+**自定义域名示例：**
+```bash
+mikit start --port 8080 --root . --domain test.local
+```
+
+访问 URL：
+```text
+http://test-mikit-cli.test.local:8080
+```
 
 ## 项目结构
 
