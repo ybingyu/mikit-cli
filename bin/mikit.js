@@ -36,9 +36,10 @@ program
 program
   .command('start')
   .description('Start local development server')
-  .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
+  .option('-p, --port <port>', 'Server port (default: 8080)')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
   .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
+  .option('-a, --alias <alias>', 'Alias config file for subdomain project mapping')
   .option('-v, --virtual <virtual>', 'Virtual directory mapping (format: /path:/physical/path)', (value, previous) => {
     const mappings = previous || {};
     // 查找第一个冒号的位置，处理Windows路径中的冒号
@@ -56,6 +57,7 @@ program
       port: options.port,
       root: options.root,
       domain: options.domain,
+      alias: options.alias,
       virtual: options.virtual
     });
   });
@@ -88,9 +90,10 @@ program
 program
   .command('serve')
   .description('Start local development server (alias for start)')
-  .option('-p, --port <port>', 'Server port (default: 8080)', '8080')
+  .option('-p, --port <port>', 'Server port (default: 8080)')
   .option('-r, --root <root>', 'Root directory (default: .)', '.')
   .option('-d, --domain <domain>', 'Domain name (default: y.bindyy.cn)', 'y.bindyy.cn')
+  .option('-a, --alias <alias>', 'Alias config file for subdomain project mapping')
   .option('-v, --virtual <virtual>', 'Virtual directory mapping (format: /path:/physical/path)', (value, previous) => {
     const mappings = previous || {};
     // 查找第一个冒号的位置，处理Windows路径中的冒号
@@ -108,6 +111,7 @@ program
       port: options.port,
       root: options.root,
       domain: options.domain,
+      alias: options.alias,
       virtual: options.virtual
     });
   });

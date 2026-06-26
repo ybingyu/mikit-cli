@@ -29,6 +29,7 @@ mikit start [选项]
 - `-p, --port <port>`: 服务器端口（默认：8080）
 - `-r, --root <root>`: 根目录（默认：.）
 - `-d, --domain <domain>`: 域名（默认：y.bindyy.cn）
+- `-a, --alias <alias>`: 子域名别名映射配置文件
 - `-v, --virtual <virtual>`: 虚拟目录映射（格式：/path:/physical/path）
 
 **示例：**
@@ -63,6 +64,69 @@ http://project-c.y.bindyy.cn:8080
 ```
 
 如果当前目录本身就是一个项目（当前目录下直接存在 `wwwroot`），则只加载当前项目。
+
+**Alias 子域名映射模式：**
+如果项目目录名包含中文、空格，或者项目不是标准的 `项目名/wwwroot` 结构，可以使用 alias 配置把子域名前缀映射到真实目录。这样不用调整原项目结构，也能保持同一个访问端口。
+
+例如在 `F:\NDW` 下创建 `mikit.alias.json`：
+
+```json
+{
+  "domain": "y.bindyy.cn",
+  "port": 8080,
+  "default": "wjms",
+  "auto": [
+    "【魔域】/2026/*/*/wwwroot",
+    "【魔域】/*/*/wwwroot"
+  ],
+  "projects": {
+    "wjms": "【魔域】/2026/0518 拉新召回/lxzh/wwwroot",
+    "wb": "【魔域】/网吧/wb/wwwroot",
+    "worldcup": "【魔域】/2026/0611 世界杯/worldcup"
+  }
+}
+```
+
+`auto` 会自动扫描符合规则的项目，不需要每个新项目都手动加到 `projects`。例如：
+
+```text
+【魔域】/2026/0518 拉新召回/lxzh/wwwroot
+```
+
+会自动生成子域名前缀：
+
+```text
+lxzh.y.bindyy.cn
+```
+
+`projects` 仍然可以保留，用来处理需要自定义别名、覆盖自动别名、或者目录不符合扫描规则的项目。
+
+启动服务：
+
+```bash
+mikit start --port 8080 --root "F:\NDW" --alias "F:\NDW\mikit.alias.json"
+```
+
+启动后使用同一个端口访问：
+
+```text
+http://wjms.y.bindyy.cn:8080/index.shtml
+http://wjms.y.bindyy.cn:8080/dist/
+http://wb.y.bindyy.cn:8080/index.shtml
+http://worldcup.y.bindyy.cn:8080/index.shtml
+```
+
+端口优先级：命令行 `--port` 优先，其次使用 alias 配置里的 `port`，最后默认 `8080`。
+
+注意：
+- `projects` 里的路径默认相对 `--root`。
+- `auto` 支持 `*` 通配一级目录；服务会监听 alias 配置和自动扫描目录变化，新增项目或修改配置后通常不需要重启服务。
+- `/index.shtml` 等普通路径访问映射项目的 `wwwroot`；`/dist/` 访问同项目的 `dist` 目录。
+- `wwwroot` 页面会注入项目级热更新脚本；只有当前项目文件变化时才刷新，不会因为其他子域名项目变化而刷新。
+- `/dist/` 只做构建产物预览，不注入热更新脚本。
+- JSON 路径建议使用 `/`，不要写成 `\`，避免 `\2026`、`\0518` 被当作 JSON 转义字符。
+- JSON 最后一项不能有尾逗号。
+- 子域名需要能解析到本机，例如通过通配 DNS 或 hosts 配置到 `127.0.0.1`。
 
 ### 2. 构建项目
 Mikit-CLI 提供三种构建命令，适用于不同场景：
