@@ -129,13 +129,14 @@ http://worldcup.y.bindyy.cn:8080/index.shtml
 - 子域名需要能解析到本机，例如通过通配 DNS 或 hosts 配置到 `127.0.0.1`。
 
 ### 2. 构建项目
-Mikit-CLI 提供三种构建命令，适用于不同场景：
+Mikit-CLI 提供四种构建命令，适用于不同场景：
 
 | 命令 | 命令行 | 功能描述 |
 |------|--------|----------|
 | 基本构建 | `mikit build` | 处理所有文件，编译 SCSS 为 CSS，处理 SSI 指令，不进行压缩 |
 | 完整压缩 | `mikit build --min` | 执行基本构建，并对 HTML、CSS、JS 进行压缩 |
 | 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅对 CSS 文件进行压缩 |
+| 字体子集化 | `mikit build --minfont` | 构建后按 CSS 字体族提取字符并压缩本地字体 |
 
 **构建选项：**
 - `-o, --output <output>`: 输出目录（默认：dist）
@@ -144,6 +145,48 @@ Mikit-CLI 提供三种构建命令，适用于不同场景：
 - `--mincss`: 仅压缩 CSS
 - `--minjs`: 仅压缩 JS
 - `--autoprefixer`: 添加 CSS 前缀
+- `--minfont`: 构建完成后执行字体子集化
+- `--font-page <page>`: 字体扫描页面或 glob（默认：font.html）
+- `--font-manifest <directory>`: 字符清单目录（默认：../font）
+
+### 3. 字体子集化
+
+字体子集化读取最终 `dist` 中的 HTML 和 CSS，按实际 `font-family` 继承与覆盖关系为每个本地 TTF 生成独立字符清单，再输出 TTF、WOFF 和 WOFF2。该功能默认关闭。
+
+构建并压缩字体：
+
+```bash
+mikit build --mincss --minfont
+```
+
+仅对已有 `dist` 执行字体处理：
+
+```bash
+mikit font
+```
+
+自定义扫描页面和字符清单位置：
+
+```bash
+mikit font --font-page "*.html" --font-manifest "../font"
+```
+
+默认行为：
+
+- 优先扫描 `dist/font.html`；不存在时回退到 `dist` 根目录下的 HTML。
+- 扫描 `dist/css` 下全部 CSS，并处理后代选择器、字体继承和子元素覆盖。
+- 每个本地字体生成一个同名 TXT，例如 `font/nd.txt`。
+- HTTPS 字体不会压缩；`dist/font` 中仅由 HTTPS 引用的同名字体会移动到 `dist/font/bak`。
+- 没有提取到字符的字体保留空清单并跳过压缩。
+- 原始本地 TTF 会备份到 `dist/font/bak`。
+
+字体压缩依赖 Python fonttools，WOFF2 还需要 Brotli：
+
+```bash
+py -m pip install fonttools brotli
+```
+
+安装后需要确保 `pyftsubset` 可以从命令行直接执行。
 
 ## 核心功能
 

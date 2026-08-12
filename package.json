@@ -7,7 +7,7 @@
   },
   "main": "bin/mikit.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/font-subsetter.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js"
   },
   "keywords": [
     "mikit",

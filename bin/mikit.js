@@ -73,6 +73,9 @@ program
   .option('--minjs', 'Minify JS', false)
   .option('--png', 'Optimize PNG images', false)
   .option('--autoprefixer', 'Add CSS prefixes', false)
+  .option('--minfont', 'Subset local fonts using built HTML and CSS', false)
+  .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
+  .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
   .action((options) => {
     const builder = require('../lib/builder');
     builder.build({
@@ -82,7 +85,27 @@ program
       minifyCss: options.mincss,
       minifyJs: options.minjs,
       optimizePng: options.png,
-      autoprefixer: options.autoprefixer
+      autoprefixer: options.autoprefixer,
+      minFont: options.minfont,
+      fontPage: options.fontPage,
+      fontManifest: options.fontManifest
+    });
+  });
+
+// 独立字体压缩命令
+program
+  .command('font')
+  .description('Subset local fonts from built HTML and CSS')
+  .option('-o, --output <output>', 'Build output directory (default: dist)', 'dist')
+  .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
+  .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
+  .action((options) => {
+    const { subsetFonts } = require('../lib/font-subsetter');
+    subsetFonts({
+      projectDir: process.cwd(),
+      output: options.output,
+      fontPage: options.fontPage,
+      fontManifest: options.fontManifest
     });
   });
 
