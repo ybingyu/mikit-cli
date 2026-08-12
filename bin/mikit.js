@@ -1,35 +1,23 @@
 #!/usr/bin/env node
 
 const program = require('commander');
-const path = require('path');
-const fs = require('fs-extra');
 
 // 版本信息
 program
   .version('1.0.0')
   .description('Npm-based alternative to MiKit desktop app');
 
-// 初始化项目命令
+// 初始化当前项目的 package.json
 program
-  .command('init <project-name>')
-  .description('Create a new project with template')
-  .option('-t, --template <template>', 'Template name (default, mobile)', 'default')
-  .action((projectName, options) => {
-    const projectPath = path.join(process.cwd(), projectName);
-    
-    // 检查目录是否存在
-    if (fs.existsSync(projectPath)) {
-      console.error('Error: Directory already exists');
-      process.exit(1);
-    }
-    
-    // 创建目录
-    fs.mkdirSync(projectPath, { recursive: true });
-    
-    // 根据模板创建项目结构
-    createProjectFromTemplate(projectPath, options.template);
-    
-    console.log(`Project ${projectName} created successfully!`);
+  .command('init')
+  .allowExcessArguments(false)
+  .description('Create package.json with Mikit workflow config in current directory')
+  .action(() => {
+    runWorkflowCommand('init', () => {
+      const { createInitialPackageJson } = require('../lib/project-initializer');
+      const result = createInitialPackageJson(process.cwd());
+      console.log('[mikit init] 已生成：' + result.packagePath);
+    });
   });
 
 // 启动开发服务器命令
@@ -89,6 +77,51 @@ program
       minFont: options.minfont,
       fontPage: options.fontPage,
       fontManifest: options.fontManifest
+    });
+  });
+
+// 替换构建后 CSS 资源地址
+program
+  .command('replace')
+  .description('Replace built CSS assets using package.json mikit.replace config')
+  .action(() => {
+    runWorkflowCommand('replace', () => {
+      const { replaceCssAssets } = require('../lib/css-replacer');
+      const summary = replaceCssAssets({ projectDir: process.cwd() });
+      console.log(
+        '[mikit replace] 完成：处理 ' + summary.files +
+        ' 个 CSS，更新 ' + summary.changed + ' 个，环境 ' + summary.env + '。'
+      );
+    });
+  });
+
+// 打包 Go 模板和构建资源
+program
+  .command('pack')
+  .description('Pack SHTML as Go templates using package.json mikit.pack config')
+  .action(() => {
+    runWorkflowCommand('pack', () => {
+      const { packGoTemplates } = require('../lib/go-packer');
+      const summary = packGoTemplates({ projectDir: process.cwd() });
+      console.log(
+        '[mikit pack] 完成：已清空旧输出，页面 ' + summary.pages +
+        ' 个，资源 ' + summary.assets + ' 个。'
+      );
+    });
+  });
+
+// 同步构建后的 CSS 到 SVN 工作副本
+program
+  .command('sync-svn')
+  .description('Sync built CSS to an SVN working copy using package.json config')
+  .action(() => {
+    runWorkflowCommand('sync-svn', () => {
+      const { syncCssToSvn } = require('../lib/svn-css-sync');
+      const summary = syncCssToSvn({ projectDir: process.cwd() });
+      console.log(
+        '[mikit sync-svn] 完成：更新 ' + summary.copied +
+        ' 个，跳过 ' + summary.skipped + ' 个。'
+      );
     });
   });
 
@@ -164,109 +197,11 @@ if (!program.args.length) {
   program.outputHelp();
 }
 
-// 创建项目模板
-function createProjectFromTemplate(projectPath, template) {
-  // 简单的模板结构
-  const templates = {
-    default: {
-      'wwwroot/index.html': `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-    <h1>Hello World!</h1>
-    <script src="js/script.js"></script>
-</body>
-</html>`,
-      'wwwroot/css/style.css': `body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-}
-
-h1 {
-    color: #333;
-}`,
-      'wwwroot/js/script.js': `console.log('Hello World!');`,
-      'package.json': `{
-  "name": "${path.basename(projectPath)}",
-  "version": "1.0.0",
-  "description": "",
-  "scripts": {
-    "start": "mikit start",
-    "build": "mikit build",
-    "serve": "mikit serve",
-    "watch": "mikit watch"
-  },
-  "devDependencies": {
-    "mikit-cli": "file:../mikit-cli"
+function runWorkflowCommand(name, action) {
+  try {
+    action();
+  } catch (error) {
+    console.error('[mikit ' + name + '] ' + error.message);
+    process.exitCode = 1;
   }
-}`
-    },
-    mobile: {
-      'wwwroot/index.html': `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mobile Project</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-    <h1>Hello Mobile!</h1>
-    <script src="js/script.js"></script>
-</body>
-</html>`,
-      'wwwroot/css/style.css': `* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
-    color: #333;
-}
-
-h1 {
-    font-size: 1.8rem;
-    margin: 20px;
-}`,
-      'wwwroot/js/script.js': `console.log('Hello Mobile!');`,
-      'package.json': `{
-  "name": "${path.basename(projectPath)}",
-  "version": "1.0.0",
-  "description": "",
-  "scripts": {
-    "start": "mikit start",
-    "build": "mikit build",
-    "serve": "mikit serve",
-    "watch": "mikit watch"
-  },
-  "devDependencies": {
-    "mikit-cli": "file:../mikit-cli"
-  }
-}`
-    }
-  };
-
-  const selectedTemplate = templates[template] || templates.default;
-
-  // 创建文件
-  Object.keys(selectedTemplate).forEach(filePath => {
-    const fullPath = path.join(projectPath, filePath);
-    const directory = path.dirname(fullPath);
-    
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory, { recursive: true });
-    }
-    
-    fs.writeFileSync(fullPath, selectedTemplate[filePath]);
-  });
 }

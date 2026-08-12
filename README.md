@@ -20,6 +20,24 @@ npm install --save-dev mikit-cli
 
 ## 基本命令
 
+### 初始化项目配置
+
+在已有项目根目录执行：
+
+```bash
+mikit init
+```
+
+命令只会在当前目录生成 `package.json`，不会创建项目目录、页面、CSS 或 JavaScript 模板。生成的配置包含：
+
+- `mikit replace`、`mikit pack`、`mikit sync-svn` 对应的 npm scripts。
+- `mikit.replace`、`mikit.pack`、`mikit.syncSvn` 基础配置。
+- CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
+- `replace.rules` 默认留空，需按项目填写替换规则。
+- `syncSvn.target` 默认留空，需填写项目对应的 SVN CSS 目录。
+
+如果当前目录已经存在 `package.json`，命令会报错退出并保留原文件，不会覆盖。原来的 `mikit init <project-name>` 项目模板功能已移除。
+
 ### 1. 启动开发服务器
 ```bash
 mikit start [选项]
@@ -236,6 +254,115 @@ mikit start --port 8080 --root . --domain test.local
 ```text
 http://test-mikit-cli.test.local:8080
 ```
+
+## 构建后处理命令
+
+以下三个命令从当前项目的 `package.json` 顶层 `mikit` 字段读取配置：
+
+```bash
+mikit replace
+mikit pack
+mikit sync-svn
+```
+
+配置到项目的 `scripts` 后，也可以执行：
+
+```bash
+npm run replace
+npm run pack
+npm run sync:svn
+```
+
+三个命令都会直接执行实际操作，不提供预览或 `dry-run` 模式。
+
+完整配置示例：
+
+```json
+{
+  "scripts": {
+    "mbuild": "mikit build --mincss",
+    "replace": "mikit replace",
+    "replace:dev": "set NODE_ENV=pp && npm run replace",
+    "replace:build": "set NODE_ENV=production && npm run replace",
+    "pack": "mikit pack",
+    "sync:svn": "mikit sync-svn"
+  },
+  "mikit": {
+    "replace": {
+      "root": "dist",
+      "include": ["**/*.css"],
+      "rules": [
+        {
+          "from": "../img/origin/",
+          "to": "https://image.99.com/my/activity/2026/08/hks/origin/"
+        },
+        {
+          "from": "../img/",
+          "to": "https://img9.99.com/my/activity/2026/08/hks/"
+        },
+        {
+          "from": "../../font/",
+          "to": {
+            "default": "https://wjdown.99.com/games/my/2026/hks/font/",
+            "production": "https://myvideo.99.com/games/my/2026/hks/font/"
+          }
+        },
+        {
+          "from": "../font/",
+          "to": {
+            "default": "https://wjdown.99.com/games/my/2026/hks/font/",
+            "production": "https://myvideo.99.com/games/my/2026/hks/font/"
+          }
+        },
+        { "from": "?#font-spider", "to": "" },
+        {
+          "from": "wjdown.99.com",
+          "to": "myvideo.99.com",
+          "env": "production"
+        }
+      ]
+    },
+    "pack": {
+      "source": "wwwroot",
+      "dist": "dist",
+      "output": "packed",
+      "pageDirs": [".", "include"],
+      "assetDirs": ["js", "css"],
+      "excludePages": ["*font*.shtml"]
+    },
+    "syncSvn": {
+      "source": "dist/css",
+      "target": "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks\\view\\css",
+      "files": ["*"]
+    }
+  }
+}
+```
+
+### `mikit replace`
+
+- 只处理 `include` 命中的 CSS 文件，规则按数组顺序执行。
+- `from` 使用普通字符串全量替换，不需要编写正则表达式。
+- `to` 可以是字符串，也可以是环境对象；优先读取当前 `NODE_ENV`，没有对应项时使用 `default`。
+- 规则配置 `env` 后只在对应环境执行；也可以配置成环境名称数组。
+- 下列情况会跳过写入：CSS 文件未命中 `include`、规则的 `env` 与当前环境不一致，或执行全部规则后文件内容没有变化。
+
+### `mikit pack`
+
+- 从 `pageDirs` 复制直接位于目录中的 `.shtml` 文件。
+- 将 `<!--#include virtual="include/_rule.shtml"-->` 转成 `<?#template "_rule.shtml" .?>`。
+- 从 `dist` 递归复制 `assetDirs` 中的资源目录到 `output`。
+- 每次打包前会清空整个 `output` 目录，再重新生成本次包，避免上一版残留文件。
+- 清理前会先校验所有页面目录和资源目录；配置错误时保留旧包。
+- `output` 必须是项目内的独立目录，不能是项目根目录，不能与 `source`/`dist` 重叠，也不能位于 `.git`、`.svn` 或 `node_modules` 中。
+
+### `mikit sync-svn`
+
+- `files: ["*"]` 或 `files: ["*.css"]` 表示同步 `source` 目录第一层的全部 CSS。
+- 支持 `style*.css`、`phone.css` 等通配或明确文件名，多个规则可组合。
+- 无论通配符如何配置，都不会同步非 CSS 文件。
+- 内容相同的目标文件会跳过；复制后使用 SHA-256 校验。
+- 目标必须是已经存在的 SVN 工作副本目录。命令只复制 CSS，不执行 `svn add`、`svn commit` 或删除操作。
 
 ## 项目结构
 
