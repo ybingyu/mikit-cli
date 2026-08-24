@@ -100,14 +100,38 @@ Example:
 
 ## Project initialization and documentation
 
-`mikit init` will add:
+Both `mikit init` and `README.md` are required parts of this feature and must be updated in the same implementation.
+
+`mikit init` will preserve the current generated workflow and add:
 
 - a `png` npm script using `mikit png`;
 - starter `mikit.png` configuration with `root: "dist"`, `level: "balanced"`, and an empty exclusion list.
 
-It will not make every generated build script run PNG optimization automatically. Users opt in through `mikit build --png` or the standalone npm script.
+The relevant generated content will include:
 
-README documentation will cover configuration, exclusions, effort presets, standalone usage, build integration, strict-lossless guarantees, and the difference from TinyPNG/color-count tools.
+```json
+{
+  "scripts": {
+    "png": "mikit png"
+  },
+  "mikit": {
+    "png": {
+      "root": "dist",
+      "level": "balanced",
+      "exclude": []
+    }
+  }
+}
+```
+
+This is additive: the initializer must retain the user's current generated `mbuild`, replacement, pack, and SVN workflow scripts and configurations. It will not make every generated build script run PNG optimization automatically. Users opt in through `mikit build --png` or the standalone npm script.
+
+`README.md` will be updated in both relevant locations:
+
+- the `mikit init` section will list the generated `png` npm script and `mikit.png` starter configuration;
+- the build/standalone command documentation will explain `mikit png`, `mikit build --png`, custom output handling, exclusion globs, the three effort presets, summary output, strict-lossless guarantees, and the difference from TinyPNG or fixed color-count tools.
+
+Initializer and README examples must match the actual defaults and CLI behavior exactly.
 
 ## Implementation boundaries
 
