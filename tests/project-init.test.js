@@ -36,17 +36,30 @@ function testCreatesPackageJsonInCurrentDirectory() {
     const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
     assert.equal(packageJson.name, path.basename(fixtureDir));
     assert.deepEqual(packageJson.scripts, {
-      start: 'mikit start',
-      build: 'mikit build',
+      mbuild: 'mikit build --mincss',
+      'mbuild:font': 'mikit build --mincss --minfont',
+      png: 'mikit png',
       replace: 'mikit replace',
+      'replace:dev': 'set NODE_ENV=pp &&  npm run replace',
+      'replace:build': 'set NODE_ENV=production &&  npm run replace',
+      dev: 'npm run mbuild  && npm run replace:dev',
+      build: 'npm run mbuild  && npm run replace:build',
       pack: 'mikit pack',
-      'sync:svn': 'mikit sync-svn'
+      'sync:svn': 'mikit sync-svn',
+      'dev:svn': 'npm run dev && npm run sync:svn',
+      'build:svn': 'npm run build && npm run sync:svn'
     });
     assert.deepEqual(packageJson.mikit, {
       replace: {
         root: 'dist',
         include: ['**/*.css'],
-        rules: []
+        rules: [
+          {
+            disabled: false,
+            from: '../img/',
+            to: 'https://img9.99.com/my/activity/example/'
+          }
+        ]
       },
       pack: {
         source: 'wwwroot',
@@ -60,6 +73,11 @@ function testCreatesPackageJsonInCurrentDirectory() {
         source: 'dist/css',
         target: '',
         files: ['*']
+      },
+      png: {
+        root: 'dist',
+        level: 'balanced',
+        exclude: []
       }
     });
   } finally {

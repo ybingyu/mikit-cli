@@ -65,18 +65,33 @@ program
   .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
   .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
   .action((options) => {
-    const builder = require('../lib/builder');
-    builder.build({
-      output: options.output,
-      minify: options.min,
-      minifyHtml: options.minhtml,
-      minifyCss: options.mincss,
-      minifyJs: options.minjs,
-      optimizePng: options.png,
-      autoprefixer: options.autoprefixer,
-      minFont: options.minfont,
-      fontPage: options.fontPage,
-      fontManifest: options.fontManifest
+    runWorkflowCommand('build', () => {
+      const builder = require('../lib/builder');
+      builder.build({
+        output: options.output,
+        minify: options.min,
+        minifyHtml: options.minhtml,
+        minifyCss: options.mincss,
+        minifyJs: options.minjs,
+        optimizePng: options.png,
+        autoprefixer: options.autoprefixer,
+        minFont: options.minfont,
+        fontPage: options.fontPage,
+        fontManifest: options.fontManifest
+      });
+    });
+  });
+
+
+// 严格无损压缩 PNG 图片
+program
+  .command('png')
+  .description('Optimize PNG images using package.json mikit.png config')
+  .action(() => {
+    runWorkflowCommand('png', () => {
+      const { optimizePngImages, formatPngSummary } = require('../lib/png-optimizer');
+      const summary = optimizePngImages({ projectDir: process.cwd() });
+      console.log('[mikit png] 完成：' + formatPngSummary(summary));
     });
   });
 

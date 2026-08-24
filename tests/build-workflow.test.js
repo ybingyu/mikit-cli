@@ -29,6 +29,7 @@ function createFixture() {
         root: 'dist',
         include: ['**/*.css'],
         rules: [
+          { disabled: true, from: '../img/', to: 'https://disabled.example/' },
           { from: '../img/origin/', to: 'https://origin.example/' },
           { from: '../img/', to: 'https://image.example/' },
           {
@@ -142,6 +143,7 @@ try {
   const replacedCss = fs.readFileSync(path.join(projectDir, 'dist', 'css', 'style.css'), 'utf8');
   assert.match(replacedCss, /https:\/\/origin\.example\/a\.png/);
   assert.match(replacedCss, /https:\/\/image\.example\/b\.png/);
+  assert.doesNotMatch(replacedCss, /disabled\.example/);
   assert.match(replacedCss, /https:\/\/font-prod\.example\/a\.woff2/);
   assert.doesNotMatch(replacedCss, /font-spider/);
   assert.match(replacedCss, /prod-host\.example/);

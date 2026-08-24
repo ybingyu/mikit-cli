@@ -30,10 +30,10 @@ mikit init
 
 命令只会在当前目录生成 `package.json`，不会创建项目目录、页面、CSS 或 JavaScript 模板。生成的配置包含：
 
-- `mikit replace`、`mikit pack`、`mikit sync-svn` 对应的 npm scripts。
-- `mikit.replace`、`mikit.pack`、`mikit.syncSvn` 基础配置。
+- 固定生成构建、PNG 压缩、替换、打包和 SVN 同步所需的 12 个 npm scripts。
+- `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png` 基础配置。
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
-- `replace.rules` 默认留空，需按项目填写替换规则。
+- `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.target` 默认留空，需填写项目对应的 SVN CSS 目录。
 
 如果当前目录已经存在 `package.json`，命令会报错退出并保留原文件，不会覆盖。原来的 `mikit init <project-name>` 项目模板功能已移除。
@@ -147,7 +147,7 @@ http://worldcup.y.bindyy.cn:8080/index.shtml
 - 子域名需要能解析到本机，例如通过通配 DNS 或 hosts 配置到 `127.0.0.1`。
 
 ### 2. 构建项目
-Mikit-CLI 提供四种构建命令，适用于不同场景：
+Mikit-CLI 提供多种构建方式，适用于不同场景：
 
 | 命令 | 命令行 | 功能描述 |
 |------|--------|----------|
@@ -155,6 +155,7 @@ Mikit-CLI 提供四种构建命令，适用于不同场景：
 | 完整压缩 | `mikit build --min` | 执行基本构建，并对 HTML、CSS、JS 进行压缩 |
 | 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅对 CSS 文件进行压缩 |
 | 字体子集化 | `mikit build --minfont` | 构建后按 CSS 字体族提取字符并压缩本地字体 |
+| 无损 PNG 压缩 | `mikit build --png` | 构建完成后递归压缩输出目录中的 PNG，保持像素无损 |
 
 **构建选项：**
 - `-o, --output <output>`: 输出目录（默认：dist）
@@ -163,6 +164,7 @@ Mikit-CLI 提供四种构建命令，适用于不同场景：
 - `--mincss`: 仅压缩 CSS
 - `--minjs`: 仅压缩 JS
 - `--autoprefixer`: 添加 CSS 前缀
+- `--png`: 构建完成后对实际输出目录执行严格无损 PNG 压缩
 - `--minfont`: 构建完成后执行字体子集化
 - `--font-page <page>`: 字体扫描页面或 glob（默认：font.html）
 - `--font-manifest <directory>`: 字符清单目录（默认：../font）
@@ -206,7 +208,7 @@ py -m pip install fonttools brotli
 
 安装后需要确保 `pyftsubset` 可以从命令行直接执行。
 
-如果不使用字体压缩功能，则不需要安装 Python、fonttools 或 Brotli，`mikit start`、普通 `mikit build`、`mikit replace`、`mikit pack`、`mikit sync-svn` 和 `mikit init` 均不受影响。
+如果不使用字体压缩功能，则不需要安装 Python、fonttools 或 Brotli，`mikit start`、普通 `mikit build`、`mikit png`、`mikit replace`、`mikit pack`、`mikit sync-svn` 和 `mikit init` 均不受影响。
 
 ## 核心功能
 
@@ -259,9 +261,10 @@ http://test-mikit-cli.test.local:8080
 
 ## 构建后处理命令
 
-以下三个命令从当前项目的 `package.json` 顶层 `mikit` 字段读取配置：
+以下四个命令从当前项目的 `package.json` 顶层 `mikit` 字段读取配置：
 
 ```bash
+mikit png
 mikit replace
 mikit pack
 mikit sync-svn
@@ -270,12 +273,13 @@ mikit sync-svn
 配置到项目的 `scripts` 后，也可以执行：
 
 ```bash
+npm run png
 npm run replace
 npm run pack
 npm run sync:svn
 ```
 
-三个命令都会直接执行实际操作，不提供预览或 `dry-run` 模式。
+四个命令都会直接执行实际操作，不提供预览或 `dry-run` 模式。
 
 完整配置示例：
 
@@ -283,17 +287,28 @@ npm run sync:svn
 {
   "scripts": {
     "mbuild": "mikit build --mincss",
+    "mbuild:font": "mikit build --mincss --minfont",
+    "png": "mikit png",
     "replace": "mikit replace",
-    "replace:dev": "set NODE_ENV=pp && npm run replace",
-    "replace:build": "set NODE_ENV=production && npm run replace",
+    "replace:dev": "set NODE_ENV=pp &&  npm run replace",
+    "replace:build": "set NODE_ENV=production &&  npm run replace",
+    "dev": "npm run mbuild  && npm run replace:dev",
+    "build": "npm run mbuild  && npm run replace:build",
     "pack": "mikit pack",
-    "sync:svn": "mikit sync-svn"
+    "sync:svn": "mikit sync-svn",
+    "dev:svn": "npm run dev && npm run sync:svn",
+    "build:svn": "npm run build && npm run sync:svn"
   },
   "mikit": {
     "replace": {
       "root": "dist",
       "include": ["**/*.css"],
       "rules": [
+        {
+          "disabled": false,
+          "from": "../img/",
+          "to": "https://img9.99.com/my/activity/example/"
+        },
         {
           "from": "../img/origin/",
           "to": "https://image.99.com/my/activity/2026/08/hks/origin/"
@@ -336,6 +351,11 @@ npm run sync:svn
       "source": "dist/css",
       "target": "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks\\view\\css",
       "files": ["*"]
+    },
+    "png": {
+      "root": "dist",
+      "level": "balanced",
+      "exclude": []
     }
   }
 }
@@ -346,8 +366,8 @@ npm run sync:svn
 - 只处理 `include` 命中的 CSS 文件，规则按数组顺序执行。
 - `from` 使用普通字符串全量替换，不需要编写正则表达式。
 - `to` 可以是字符串，也可以是环境对象；优先读取当前 `NODE_ENV`，没有对应项时使用 `default`。
-- 规则配置 `env` 后只在对应环境执行；也可以配置成环境名称数组。
-- 下列情况会跳过写入：CSS 文件未命中 `include`、规则的 `env` 与当前环境不一致，或执行全部规则后文件内容没有变化。
+- 规则配置 `disabled: true` 时会直接跳过；删除 `disabled` 或改为 `false` 后才会参与替换。`env` 只在对应环境执行，也可以配置成环境名称数组。
+- 下列情况会跳过：规则设置了 `disabled: true`、规则的 `env` 与当前环境不一致、CSS 文件未命中 `include`，或执行全部有效规则后文件内容没有变化。
 
 ### `mikit pack`
 
@@ -357,6 +377,48 @@ npm run sync:svn
 - 每次打包前会清空整个 `output` 目录，再重新生成本次包，避免上一版残留文件。
 - 清理前会先校验所有页面目录和资源目录；配置错误时保留旧包。
 - `output` 必须是项目内的独立目录，不能是项目根目录，不能与 `source`/`dist` 重叠，也不能位于 `.git`、`.svn` 或 `node_modules` 中。
+
+
+### `mikit png`
+
+递归扫描 `mikit.png.root` 下扩展名为 `.png` 的文件（扩展名大小写不敏感），使用严格无损方式重新编码，并且只有输出确实更小时才覆盖原文件。压缩不会调用颜色量化接口，不减少实际颜色数量，也不会改变解码后的像素；允许在像素完全等价时优化位深、颜色类型、调色板和 PNG 行过滤方式。非关键 PNG 元数据不会被主动整体剥离。
+
+配置示例：
+
+```json
+"png": {
+  "root": "dist",
+  "level": "balanced",
+  "exclude": [
+    "img/no-compress.png",
+    "img/original/**",
+    "**/sprite-*.png"
+  ]
+}
+```
+
+- `root`：独立执行 `mikit png` 时的扫描目录，默认是 `dist`。
+- `exclude`：相对 `root` 的 glob 数组，可排除单张图片、目录或文件名模式；建议统一使用 `/`。
+- `level`：只控制压缩时尝试的无损算法范围和耗时，不是画质参数：
+  - `fast`：尝试较少的过滤方案，速度最快，文件通常稍大。
+  - `balanced`：默认等级，在耗时与体积之间取平衡。
+  - `max`：尝试全部受支持的过滤方案，耗时最高，但不保证每张图都比 `balanced` 更小。
+
+独立压缩已有构建目录：
+
+```powershell
+mikit png
+```
+
+构建完成后压缩 PNG：
+
+```powershell
+mikit build --output custom-dist --png
+```
+
+`build --png` 会使用本次构建的实际输出目录（例如上面的 `custom-dist`），而不是 `mikit.png.root`；`level` 和 `exclude` 仍读取 `mikit.png`。如果缺少配置、目录不存在或某张 PNG 无法解析，命令会输出包含相对图片路径的错误并以非零状态退出。
+
+与 TinyPNG 的区别：TinyPNG 通常通过颜色量化等有损方式换取更小体积，因此很多图片会比这里的严格无损结果更小。本功能不采用这种方式，三个等级都保持解码后像素完全一致；等级越高只代表尝试更多无损压缩方案，不代表降低画质。
 
 ### `mikit sync-svn`
 

@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { Transformer } = require('@napi-rs/image');
 
 const repoRoot = path.resolve(__dirname, '..');
 const cliPath = path.join(repoRoot, 'bin', 'mikit.js');
@@ -52,9 +53,10 @@ function testHelpAndMissingConfig() {
     assert.match(help.stdout, /\breplace\b/);
     assert.match(help.stdout, /\bpack\b/);
     assert.match(help.stdout, /\bsync-svn\b/);
+    assert.match(help.stdout, /\bpng\b/);
     assert.doesNotMatch(help.stdout, /dry-run/);
 
-    for (const command of ['replace', 'pack', 'sync-svn']) {
+    for (const command of ['replace', 'pack', 'sync-svn', 'png']) {
       const result = run(command, fixtureDir);
       assert.equal(result.status, 1, `${command} should exit 1. stdout=${result.stdout} stderr=${result.stderr}`);
       assert.match(result.stderr, new RegExp(`\\[mikit ${command}\\]`));
@@ -169,5 +171,47 @@ function testSuccessfulCommands() {
   }
 }
 
+function testSuccessfulPngCommand() {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-cli-success-'));
+  const pixels = Buffer.alloc(32 * 32 * 4);
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    pixels[offset] = (offset / 4) & 0xff;
+    pixels[offset + 1] = 64;
+    pixels[offset + 2] = 128;
+    pixels[offset + 3] = 255;
+  }
+
+  try {
+    write(path.join(fixtureDir, 'package.json'), JSON.stringify({
+      name: 'png-cli-success',
+      version: '1.0.0',
+      mikit: {
+        png: {
+          root: 'dist',
+          level: 'balanced',
+          exclude: []
+        }
+      }
+    }, null, 2));
+    mkdir(path.join(fixtureDir, 'dist', 'img'));
+    fs.writeFileSync(
+      path.join(fixtureDir, 'dist', 'img', 'a.png'),
+      Transformer.fromRgbaPixels(pixels, 32, 32).pngSync()
+    );
+
+    const result = run('png', fixtureDir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /\[mikit png\] 完成：扫描 1 个/);
+    assert.equal(fs.existsSync(path.join(fixtureDir, 'dist', 'img', 'a.png')), true);
+  } finally {
+    cleanup(
+      fixtureDir,
+      ['package.json', 'dist/img/a.png'],
+      ['dist/img', 'dist', '.']
+    );
+  }
+}
+
 testHelpAndMissingConfig();
 testSuccessfulCommands();
+testSuccessfulPngCommand();

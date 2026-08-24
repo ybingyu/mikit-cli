@@ -47,9 +47,9 @@ Settings live under `mikit.png` in the current project's `package.json`:
 
 All presets are lossless. They differ only in the number of filter/compression alternatives considered:
 
-- `fast`: tries a reduced filter set and uses heuristics to prioritize speed.
-- `balanced`: tries the full filter set while using heuristics to avoid unproductive searches.
-- `max`: tries the full filter set without the speed-oriented heuristic, prioritizing output size over runtime.
+- `fast`: tries PNG row filters `0` and `2` to prioritize speed.
+- `balanced`: tries filters `0`, `1`, `2`, and `4` for the default speed/size balance.
+- `max`: tries every row filter supported by the native lossless API (`0` through `4`), prioritizing output size over runtime.
 
 Every preset keeps color quantization and dithering disabled. Metadata stripping is disabled. A generated result is written only when it is smaller than the existing file.
 
