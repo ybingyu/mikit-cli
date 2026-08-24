@@ -198,13 +198,15 @@ mikit font --font-page "*.html" --font-manifest "../font"
 - 没有提取到字符的字体保留空清单并跳过压缩。
 - 原始本地 TTF 会备份到 `dist/font/bak`。
 
-字体压缩依赖 Python fonttools，WOFF2 还需要 Brotli：
+字体压缩依赖 Python fonttools，WOFF2 还需要 Brotli。这两个依赖不会随 `npm install -g mikit-cli` 自动安装，使用 `mikit build --minfont` 或 `mikit font` 前需要用户手动安装：
 
 ```bash
 py -m pip install fonttools brotli
 ```
 
 安装后需要确保 `pyftsubset` 可以从命令行直接执行。
+
+如果不使用字体压缩功能，则不需要安装 Python、fonttools 或 Brotli，`mikit start`、普通 `mikit build`、`mikit replace`、`mikit pack`、`mikit sync-svn` 和 `mikit init` 均不受影响。
 
 ## 核心功能
 
