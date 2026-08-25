@@ -136,13 +136,11 @@ test("rejects runtime URL mappings outside the output directory", (t) => {
 });
 
 test("merges planned font character maps in map and code point order", () => {
-  const characters = mergeFontCharacterMaps({
-    fontFamilies: new Set(["Display", "Unused"]),
-    maps: [
-      { Display: "甲乙😀", Other: "不应保留" },
-      { Display: "乙丙😀丁", Unused: "" },
-    ],
-  });
+  const characters = mergeFontCharacterMaps(
+    new Set(["Display", "Unused"]),
+    { Display: "甲乙😀", Other: "不应保留" },
+    { Display: "乙丙😀丁", Unused: "" },
+  );
 
   assert.deepEqual(characters, {
     Display: "甲乙😀丙丁",
