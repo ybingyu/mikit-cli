@@ -67,6 +67,36 @@ test('loads static defaults when package.json or mikit.font is absent', () => {
   }
 });
 
+test('loads from process.cwd when projectDir is omitted', () => {
+  const dir = createFixture();
+  const originalCwd = process.cwd();
+
+  try {
+    writePackageJson(dir, { mikit: { font: { wait: 250 } } });
+    process.chdir(dir);
+
+    assert.equal(loadFontRuntimeConfig().wait, 250);
+  } finally {
+    process.chdir(originalCwd);
+    cleanup(dir, ['package.json']);
+  }
+});
+
+test('treats a null package.json root as missing mikit.font', () => {
+  const dir = createFixture();
+
+  try {
+    writePackageJson(dir, null);
+
+    assert.deepEqual(
+      loadFontRuntimeConfig(dir),
+      DEFAULT_FONT_RUNTIME_CONFIG,
+    );
+  } finally {
+    cleanup(dir, ['package.json']);
+  }
+});
+
 test('loads and normalizes configured runtime font pages', () => {
   const dir = createFixture();
   const browserPath = path.join(dir, 'browser.exe');
