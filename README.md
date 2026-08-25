@@ -205,7 +205,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 
 - 优先扫描 `dist/font.html`；不存在时回退到 `dist` 根目录下的 HTML。
 - 扫描 `dist/css` 下全部 CSS，并处理后代选择器、字体继承和子元素覆盖。
-- 静态 HTML 中的字面文本会保留，因此 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中明确写出的各状态文字都可参与提取。
+- 静态 HTML 中的字面文本会保留，因此 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中明确写出的各状态文字都可参与提取；Vue 的 `{{ expression }}` 插值表达式本身会被忽略，其实际显示文字由动态 URL 扫描结果补充。
 - 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白会归一为一个空格。
 - 只有提取到至少 1 个字符的本地字体才会生成同名 TXT 清单、备份原始 TTF，并调用 `pyftsubset` 输出 TTF、WOFF、WOFF2。
 - 某字体提取字符数为 0 时，不生成空 TXT，不调用 `pyftsubset`，不备份该字体，并删除上一次遗留的同名 TXT 以及构建输出中该字体同名的 TTF、WOFF、WOFF2，因此最终不会留下任何该字体文件。

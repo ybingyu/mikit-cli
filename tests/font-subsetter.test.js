@@ -108,6 +108,24 @@ test("collects both static Vue directive branches without executing them", () =>
   });
 });
 
+test("ignores Vue interpolation expressions while retaining surrounding text", () => {
+  const characters = collectFontCharacters({
+    htmlContents: [
+      '<div class="luck-tips"><p>封魔之力达{{fmzl[user.user_type]}} <b>好运次数+2</b></p></div>',
+    ],
+    cssFiles: [
+      {
+        content: '.luck-tips{font-family:"Display"}',
+      },
+    ],
+    fontFamilies: new Set(["Display"]),
+  });
+
+  assert.deepEqual(characters, {
+    Display: "封魔之力达 好运次数+2",
+  });
+});
+
 test("derives local HTML targets from runtime URLs", (t) => {
   const outputDir = createOutputFixture(t);
 
