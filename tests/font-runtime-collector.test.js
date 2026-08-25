@@ -42,6 +42,7 @@ function createBrowserHarness({
   gotoByUrl = {},
   selectorErrorByUrl = {},
   evaluationByUrl = {},
+  closeError = null,
 } = {}) {
   const calls = {
     close: 0,
@@ -107,6 +108,9 @@ function createBrowserHarness({
     },
     async close() {
       calls.close += 1;
+      if (closeError) {
+        throw closeError;
+      }
     },
   };
 
@@ -530,6 +534,69 @@ test('wraps page failures with the exact URL and always closes the browser', asy
       assert.equal(failureCase.harness.calls.close, 1);
     });
   }
+});
+
+test('preserves the page URL and root cause when browser close also fails', async () => {
+  const closeError = new Error('close rejected');
+  const harness = createBrowserHarness({
+    gotoByUrl: { [PAGE_ONE]: new Error('navigation rejected') },
+    closeError,
+  });
+
+  await assert.rejects(
+    collectRuntimeFontCharacters(
+      {
+        pages: [PAGE_ONE],
+        waitFor: null,
+        wait: 0,
+        timeout: 15000,
+        browserExecutable: 'browser.exe',
+        fontFamilies: ['Display'],
+      },
+      { chromium: harness.chromium, onWarning: () => {} },
+    ),
+    (error) => {
+      assert.equal(error.message.includes(PAGE_ONE), true);
+      assert.equal(error.message.includes('navigation rejected'), true);
+      assert.equal(error.message.includes('关闭浏览器失败：close rejected'), true);
+      assert.equal(error.closeError, closeError);
+      return true;
+    },
+  );
+  assert.equal(harness.calls.close, 1);
+});
+
+test('rejects with a clear close error after otherwise successful collection', async () => {
+  const closeError = new Error('close rejected');
+  const harness = createBrowserHarness({
+    recordsByUrl: {
+      [PAGE_ONE]: [{ text: '成功页面', fontFamily: 'Display' }],
+    },
+    closeError,
+  });
+
+  await assert.rejects(
+    collectRuntimeFontCharacters(
+      {
+        pages: [PAGE_ONE],
+        waitFor: null,
+        wait: 0,
+        timeout: 15000,
+        browserExecutable: 'browser.exe',
+        fontFamilies: ['Display'],
+      },
+      { chromium: harness.chromium, onWarning: () => {} },
+    ),
+    (error) => {
+      assert.equal(
+        error.message,
+        '关闭运行时字体浏览器失败：close rejected',
+      );
+      assert.equal(error.cause, closeError);
+      return true;
+    },
+  );
+  assert.equal(harness.calls.close, 1);
 });
 
 test('rejects the whole collection when the second URL fails without returning partial output', async () => {
