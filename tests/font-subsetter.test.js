@@ -13,31 +13,40 @@ const {
   mergeFontCharacterMaps,
 } = require("../lib/font-subsetter");
 
-function removeFixturePath(targetPath) {
-  if (!fs.existsSync(targetPath)) {
-    return;
-  }
-
-  if (fs.lstatSync(targetPath).isDirectory()) {
-    fs.readdirSync(targetPath).forEach((entry) => {
-      removeFixturePath(path.join(targetPath, entry));
-    });
-    fs.rmdirSync(targetPath);
-    return;
-  }
-
-  fs.unlinkSync(targetPath);
-}
-
-function createOutputFixture(t) {
+function createOutputFixture(t, { files = [], directories = [] } = {}) {
   const fixtureRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), "mikit-font-subsetter-"),
   );
   const outputDir = path.join(fixtureRoot, "dist");
   fs.mkdirSync(outputDir);
-  t.after(() => removeFixturePath(fixtureRoot));
+  t.after(() => {
+    files.forEach((relativePath) => {
+      const filePath = path.join(outputDir, relativePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    directories.forEach((relativePath) => {
+      const directoryPath = path.join(outputDir, relativePath);
+      if (fs.existsSync(directoryPath)) {
+        fs.rmdirSync(directoryPath);
+      }
+    });
+    fs.rmdirSync(outputDir);
+    fs.rmdirSync(fixtureRoot);
+  });
   return outputDir;
 }
+
+test("uses explicit non-recursive fixture cleanup", () => {
+  const source = fs.readFileSync(__filename, "utf8");
+
+  assert.equal(
+    source.includes(["function remove", "FixturePath"].join("")),
+    false,
+  );
+  assert.equal(source.includes(["fs.readdir", "Sync("].join("")), false);
+});
 
 test("collects characters by computed font family", () => {
   const characters = collectFontCharacters({
@@ -149,7 +158,9 @@ test("merges planned font character maps in map and code point order", () => {
 });
 
 test("collects configured static and deduplicated runtime HTML targets", (t) => {
-  const outputDir = createOutputFixture(t);
+  const outputDir = createOutputFixture(t, {
+    files: ["font.html", "index.html"],
+  });
   const fontPageTarget = path.resolve(outputDir, "font.html");
   const indexTarget = path.resolve(outputDir, "index.html");
   const missingTarget = path.resolve(outputDir, "missing.html");
@@ -181,7 +192,14 @@ test("collects configured static and deduplicated runtime HTML targets", (t) => 
 });
 
 test("falls back to root HTML files before appending runtime targets", (t) => {
-  const outputDir = createOutputFixture(t);
+  const outputDir = createOutputFixture(t, {
+    files: [
+      "first.html",
+      "second.html",
+      path.join("campaign", "index.html"),
+    ],
+    directories: ["campaign"],
+  });
   const firstTarget = path.resolve(outputDir, "first.html");
   const secondTarget = path.resolve(outputDir, "second.html");
   const campaignTarget = path.resolve(outputDir, "campaign", "index.html");
@@ -205,6 +223,88 @@ test("falls back to root HTML files before appending runtime targets", (t) => {
     new Set([firstTarget, secondTarget, campaignTarget]),
   );
   assert.deepEqual(warnings, []);
+});
+
+test("deduplicates Windows HTML target paths case-insensitively", (t) => {
+  const outputDir = createOutputFixture(t, { files: ["index.html"] });
+  const indexTarget = path.resolve(outputDir, "index.html");
+  fs.writeFileSync(indexTarget, "runtime page");
+  const warnings = [];
+
+  const targets = collectHtmlTargets({
+    outputDir,
+    fontPage: "not-found.html",
+    pages: [
+      "http://example.test/index.shtml",
+      "http://example.test/INDEX.shtml",
+    ],
+    platform: "win32",
+    warn(message) {
+      warnings.push(message);
+    },
+  });
+
+  assert.deepEqual(targets, [indexTarget]);
+  assert.deepEqual(warnings, []);
+});
+
+test("wraps malformed percent-encoded runtime URL paths", (t) => {
+  const outputDir = createOutputFixture(t);
+
+  ["http://example.test/%.shtml", "http://example.test/%ZZ.shtml"].forEach(
+    (url) => {
+      assert.throws(
+        () => deriveHtmlTargetFromUrl(url, outputDir),
+        new Error(`运行时页面无法映射到构建目录：${url}`),
+      );
+    },
+  );
+});
+
+test("rejects existing runtime targets whose real path escapes output", (t) => {
+  const outputDir = createOutputFixture(t);
+  const url = "http://example.test/index.shtml";
+  const target = path.resolve(outputDir, "index.html");
+  const realOutputDir = path.resolve(outputDir);
+  const escapedTarget = path.resolve(outputDir, "..", "outside", "index.html");
+
+  assert.throws(
+    () =>
+      deriveHtmlTargetFromUrl(url, outputDir, {
+        existsSync(candidate) {
+          const resolvedCandidate = path.resolve(candidate);
+          return (
+            resolvedCandidate === realOutputDir || resolvedCandidate === target
+          );
+        },
+        realpathSync(candidate) {
+          return path.resolve(candidate) === realOutputDir
+            ? realOutputDir
+            : escapedTarget;
+        },
+      }),
+    new Error(`运行时页面无法映射到构建目录：${url}`),
+  );
+});
+
+test("does not resolve the real path of a missing runtime target", (t) => {
+  const outputDir = createOutputFixture(t);
+  const url = "http://example.test/missing.shtml";
+  const expectedTarget = path.resolve(outputDir, "missing.html");
+  const realpathCalls = [];
+
+  const target = deriveHtmlTargetFromUrl(url, outputDir, {
+    existsSync(candidate) {
+      return path.resolve(candidate) === path.resolve(outputDir);
+    },
+    realpathSync(candidate) {
+      realpathCalls.push(path.resolve(candidate));
+      return path.resolve(candidate);
+    },
+  });
+
+  assert.equal(target, expectedTarget);
+  assert.deepEqual(realpathCalls, [path.resolve(outputDir)]);
 });
 
 test("does not downgrade runtime target traversal errors to warnings", (t) => {
