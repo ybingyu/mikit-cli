@@ -78,6 +78,11 @@ function testCreatesPackageJsonInCurrentDirectory() {
         root: 'dist',
         level: 'balanced',
         exclude: []
+      },
+      font: {
+        pages: [],
+        wait: 1000,
+        timeout: 15000
       }
     });
   } finally {

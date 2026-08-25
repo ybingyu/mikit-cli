@@ -195,10 +195,47 @@ mikit font --font-page "*.html" --font-manifest "../font"
 
 - 优先扫描 `dist/font.html`；不存在时回退到 `dist` 根目录下的 HTML。
 - 扫描 `dist/css` 下全部 CSS，并处理后代选择器、字体继承和子元素覆盖。
-- 每个本地字体生成一个同名 TXT，例如 `font/nd.txt`。
+- 静态 HTML 中的字面文本会保留，因此 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中明确写出的各状态文字都可参与提取。
+- 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白会归一为一个空格。
+- 只有提取到至少 1 个字符的本地字体才会生成同名 TXT 清单、备份原始 TTF，并调用 `pyftsubset` 输出 TTF、WOFF、WOFF2。
+- 某字体提取字符数为 0 时，不生成空 TXT，不调用 `pyftsubset`，不备份该字体，并删除构建输出中该字体同名的 TTF、WOFF、WOFF2，因此最终不会留下任何该字体文件。
 - HTTPS 字体不会压缩；`dist/font` 中仅由 HTTPS 引用的同名字体会移动到 `dist/font/bak`。
-- 没有提取到字符的字体保留空清单并跳过压缩。
-- 原始本地 TTF 会备份到 `dist/font/bak`。
+
+#### 动态页面字符配置
+
+对于由 Vue/JavaScript、接口数据或 URL 查询参数渲染的文字，可以在项目 `package.json` 中明确列出需要访问的页面。下面的两个 URL 会按配置顺序分别采集，不需要把两个页面状态的文字手工复制到 SHTML：
+
+```json
+{
+  "mikit": {
+    "font": {
+      "pages": [
+        "http://wb.y.bindyy.cn:8080/index.shtml?o=1",
+        "http://wb.y.bindyy.cn:8080/index.shtml?o=2"
+      ],
+      "waitFor": "#app",
+      "wait": 1000,
+      "timeout": 15000,
+      "browserExecutable": ""
+    }
+  }
+}
+```
+
+配置和提取边界：
+
+- `pages` 必须是明确、有序的 HTTP/HTTPS URL 数组。Mikit 只访问列出的 URL，不猜测 `o` 等参数值，也不会自动点击按钮切换状态。
+- 缺少 `mikit.font`、缺少 `pages` 或配置为空数组时，保持原来的纯静态扫描，不启动浏览器。
+- 静态扫描负责保留模板中明确写出的全部按钮/面板状态；运行时扫描补充 Vue、JavaScript、接口或 query 参数实际渲染到 DOM 的文字，最后按字体族合并并去重。
+- 运行时会读取 DOM 文本，包括隐藏 DOM 中的文字；忽略 `script`、`style`、`noscript`，不扫描 JavaScript 源码字符串，也不提取 `::before`/`::after` 生成内容。
+- `/index.shtml?...` 会映射到 `dist/index.html` 参与静态补充；其他 `.shtml` 映射到同路径 `.html`，以 `/` 结尾的 URL 映射到 `index.html`。
+- 每页先等待 `domcontentloaded`；配置 `waitFor` 时等待该 CSS 选择器挂载，再额外等待 `wait` 毫秒。单页导航和等待上限由 `timeout` 控制，不使用 `networkidle`。
+- URL 对应的本地服务必须提前运行，例如先启动 `mikit start --port 8080`；字体命令不会自动启动服务。
+- 任一配置页面访问或解析失败时，应在移动、备份或替换字体文件前终止，避免产出只包含部分页面字符的字体包。
+- `browserExecutable: ""` 表示自动查找本机 Chrome/Edge；也可以填写明确的浏览器可执行文件路径，或设置 `MIKIT_BROWSER_EXECUTABLE`。
+- 这是一套 Mikit 内置工作流，不是 AI 猜字，也不需要为每个 URL 分别安装 Codex/浏览器插件；所有生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和这些页面实际渲染出的 DOM。
+
+> 开发状态：当前分支已经包含运行时配置校验、浏览器采集、同步子进程桥接、URL 到静态 HTML 的映射以及字符合并逻辑；`mikit font` / `mikit build --minfont` 的最终运行时接线和 `playwright-core` 依赖登记仍需完成。接线完成前，`mikit.font.pages` 不会改变实际字体输出。
 
 字体压缩依赖 Python fonttools，WOFF2 还需要 Brotli。这两个依赖不会随 `npm install -g mikit-cli` 自动安装，使用 `mikit build --minfont` 或 `mikit font` 前需要用户手动安装：
 
@@ -206,7 +243,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 py -m pip install fonttools brotli
 ```
 
-安装后需要确保 `pyftsubset` 可以从命令行直接执行。
+安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面提取还需要本机已安装 Chrome 或 Edge；`playwright-core` 只负责调用现有浏览器，不会额外下载浏览器。
 
 如果不使用字体压缩功能，则不需要安装 Python、fonttools 或 Brotli，`mikit start`、普通 `mikit build`、`mikit png`、`mikit replace`、`mikit pack`、`mikit sync-svn` 和 `mikit init` 均不受影响。
 
@@ -359,6 +396,11 @@ npm run sync:svn
       "root": "dist",
       "level": "balanced",
       "exclude": []
+    },
+    "font": {
+      "pages": [],
+      "wait": 1000,
+      "timeout": 15000
     }
   }
 }
