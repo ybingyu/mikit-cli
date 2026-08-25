@@ -177,7 +177,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--png`: 构建完成后对实际输出目录执行严格无损 PNG 压缩
 - `--minfont`: 构建完成后开启字体子集化。如果 `package.json` 配置了 `mikit.font.pages`，同一次字体处理会自动访问这些动态 URL，并与静态 HTML 字符合并，不需要额外增加命令行参数。
 - `--font-page <page>`: 指定在构建输出目录中用于静态字符扫描的 HTML 页面或 glob（默认：`font.html`）。它只控制静态 HTML 输入，不用于填写动态 URL。
-- `--font-manifest <directory>`: 指定字符清单 TXT 的输出目录（默认：`../font`，相对于项目根目录）。每个提取到字符的本地字体会生成一个同名 TXT，例如 `dist/font/title.ttf` 对应 `../font/title.txt`；该参数不改变压缩后字体文件仍输出到 `dist/font`。字符数为 0 的字体不会生成 TXT。
+- `--font-manifest <directory>`: 指定字符清单 TXT 的输出目录（默认：`../font`，相对于项目根目录）。每个提取到字符的本地字体会生成一个同名 TXT，例如 `dist/font/title.ttf` 对应 `../font/title.txt`；该参数不改变压缩后字体文件仍输出到 `dist/font`。字符数为 0 的字体不会生成 TXT；如果目录中存在上一次生成的同名 TXT，也会删除该明确文件，避免保留过期字符清单。
 
 ### 3. 字体子集化
 
@@ -208,7 +208,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 - 静态 HTML 中的字面文本会保留，因此 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中明确写出的各状态文字都可参与提取。
 - 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白会归一为一个空格。
 - 只有提取到至少 1 个字符的本地字体才会生成同名 TXT 清单、备份原始 TTF，并调用 `pyftsubset` 输出 TTF、WOFF、WOFF2。
-- 某字体提取字符数为 0 时，不生成空 TXT，不调用 `pyftsubset`，不备份该字体，并删除构建输出中该字体同名的 TTF、WOFF、WOFF2，因此最终不会留下任何该字体文件。
+- 某字体提取字符数为 0 时，不生成空 TXT，不调用 `pyftsubset`，不备份该字体，并删除上一次遗留的同名 TXT 以及构建输出中该字体同名的 TTF、WOFF、WOFF2，因此最终不会留下任何该字体文件。
 - HTTPS 字体不会压缩；`dist/font` 中仅由 HTTPS 引用的同名字体会移动到 `dist/font/bak`。
 
 #### 动态页面字符配置
