@@ -11,6 +11,7 @@ const {
   createPyftsubsetArgs,
   deriveHtmlTargetFromUrl,
   mergeFontCharacterMaps,
+  subsetFonts,
 } = require("../lib/font-subsetter");
 
 function createOutputFixture(t, { files = [], directories = [] } = {}) {
@@ -362,6 +363,74 @@ test("maps CSS family names to their font files", () => {
   assert.equal(plan.fontFamilyByName.get("display"), "Display Serif");
 });
 
+
+
+test("ignores formatting-only whitespace when collecting font characters", () => {
+  const characters = collectFontCharacters({
+    htmlContents: ['<div class="unused">\n  <span></span>\n</div>'],
+    cssFiles: [
+      {
+        content: '.unused{font-family:"Unused"}',
+      },
+    ],
+    fontFamilies: new Set(["Unused"]),
+  });
+
+  assert.deepEqual(characters, {
+    Unused: "",
+  });
+});
+test("skips zero-character fonts without creating generated files", (t) => {
+  const outputDir = createOutputFixture(t, {
+    files: [
+      "font.html",
+      "css/site.css",
+      "font/unused.ttf",
+      "font/bak/unused.ttf",
+      "font/unused.woff",
+      "font/unused.woff2",
+      "manifests/unused.txt",
+    ],
+    directories: ["font/bak", "manifests", "css", "font"],
+  });
+  const projectDir = path.dirname(outputDir);
+  const fontDir = path.join(outputDir, "font");
+  const cssDir = path.join(outputDir, "css");
+  const manifestDir = path.join(outputDir, "manifests");
+  const fontPath = path.join(fontDir, "unused.ttf");
+  const commandCalls = [];
+
+  fs.mkdirSync(fontDir);
+  fs.mkdirSync(cssDir);
+  fs.writeFileSync(path.join(outputDir, "font.html"), "<div>普通文字</div>");
+  fs.writeFileSync(
+    path.join(cssDir, "site.css"),
+    '@font-face{font-family:"Unused";src:url(../font/unused.ttf)}',
+  );
+  fs.writeFileSync(fontPath, "source font");
+  fs.writeFileSync(path.join(fontDir, "unused.woff"), "source font");
+  fs.writeFileSync(path.join(fontDir, "unused.woff2"), "source font");
+
+  const result = subsetFonts({
+    projectDir,
+    outputDir: "dist",
+    manifestDir,
+    commandRunner(command, args) {
+      commandCalls.push({ command, args });
+      return { status: 0 };
+    },
+  });
+
+  assert.deepEqual(commandCalls, []);
+  assert.deepEqual(result.processed, []);
+  assert.deepEqual(result.skipped, [fontPath]);
+  assert.deepEqual(result.manifests, []);
+  assert.equal(fs.existsSync(fontPath), false);
+  assert.equal(fs.existsSync(path.join(fontDir, "bak")), false);
+  assert.equal(fs.existsSync(path.join(fontDir, "unused.woff")), false);
+  assert.equal(fs.existsSync(path.join(fontDir, "unused.woff2")), false);
+  assert.equal(fs.existsSync(manifestDir), false);
+});
 test("passes a manifest path instead of inline Unicode", () => {
   const args = createPyftsubsetArgs({
     fontPath: "C:\\project\\dist\\font\\local.ttf",
