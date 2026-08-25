@@ -284,10 +284,10 @@ test('returns Chrome then Edge candidates on macOS and Linux', () => {
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
   ]);
   assert.deepEqual(getBrowserExecutableCandidates('linux', {}), [
-    'google-chrome',
-    'google-chrome-stable',
-    'microsoft-edge',
-    'microsoft-edge-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/microsoft-edge',
+    '/usr/bin/microsoft-edge-stable',
   ]);
 });
 
