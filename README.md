@@ -18,6 +18,16 @@ npm install -g file:F:\mikit-cli
 npm install --save-dev mikit-cli
 ```
 
+### 字体压缩依赖（可选）
+
+只有使用 `mikit build --minfont` 或 `mikit font` 时才需要安装 Python fonttools 和 Brotli；普通构建及其他命令不需要这些依赖。
+
+```bash
+py -m pip install fonttools brotli
+```
+
+安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面字符提取还需要本机已安装 Chrome 或 Edge；Mikit 使用 `playwright-core` 调用现有浏览器，不会额外下载浏览器，也不需要安装 Codex 或浏览器插件。
+
 ## 基本命令
 
 ### 初始化项目配置
@@ -31,7 +41,7 @@ mikit init
 命令只会在当前目录生成 `package.json`，不会创建项目目录、页面、CSS 或 JavaScript 模板。生成的配置包含：
 
 - 固定生成构建、PNG 压缩、替换、打包和 SVN 同步所需的 12 个 npm scripts。
-- `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png` 基础配置。
+- `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png`、`mikit.font` 基础配置。
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
 - `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
@@ -210,8 +220,8 @@ mikit font --font-page "*.html" --font-manifest "../font"
   "mikit": {
     "font": {
       "pages": [
-        "http://wb.y.bindyy.cn:8080/index.shtml?o=1",
-        "http://wb.y.bindyy.cn:8080/index.shtml?o=2"
+        "http://font-demo.example.test:8080/index.shtml?o=1",
+        "http://font-demo.example.test:8080/index.shtml?o=2"
       ],
       "waitFor": "#app",
       "wait": 1000,
@@ -237,15 +247,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 
 > 开发状态：当前分支已经包含运行时配置校验、浏览器采集、同步子进程桥接、URL 到静态 HTML 的映射以及字符合并逻辑；`mikit font` / `mikit build --minfont` 的最终运行时接线和 `playwright-core` 依赖登记仍需完成。接线完成前，`mikit.font.pages` 不会改变实际字体输出。
 
-字体压缩依赖 Python fonttools，WOFF2 还需要 Brotli。这两个依赖不会随 `npm install -g mikit-cli` 自动安装，使用 `mikit build --minfont` 或 `mikit font` 前需要用户手动安装：
-
-```bash
-py -m pip install fonttools brotli
-```
-
-安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面提取还需要本机已安装 Chrome 或 Edge；`playwright-core` 只负责调用现有浏览器，不会额外下载浏览器。
-
-如果不使用字体压缩功能，则不需要安装 Python、fonttools 或 Brotli，`mikit start`、普通 `mikit build`、`mikit png`、`mikit replace`、`mikit pack`、`mikit sync-svn` 和 `mikit init` 均不受影响。
+字体依赖的安装命令和适用范围请查看文档开头的“字体压缩依赖（可选）”。
 
 ## 核心功能
 
