@@ -7,7 +7,7 @@
   },
   "main": "bin/mikit.js",
   "scripts": {
-    "test": "node tests/font-subsetter.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js"
+    "test": "node tests/font-subsetter.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/svn-css-sync.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js"
   },
   "keywords": [
     "mikit",

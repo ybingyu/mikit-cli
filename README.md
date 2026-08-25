@@ -34,7 +34,7 @@ mikit init
 - `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png` 基础配置。
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
 - `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
-- `syncSvn.target` 默认留空，需填写项目对应的 SVN CSS 目录。
+- `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
 
 如果当前目录已经存在 `package.json`，命令会报错退出并保留原文件，不会覆盖。原来的 `mikit init <project-name>` 项目模板功能已移除。
 
@@ -349,7 +349,10 @@ npm run sync:svn
     },
     "syncSvn": {
       "source": "dist/css",
-      "target": "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks\\view\\css",
+      "targets": [
+        "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks\\view\\css",
+        "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks-h5\\view\\css"
+      ],
       "files": ["*"]
     },
     "png": {
@@ -422,11 +425,26 @@ mikit build --output custom-dist --png
 
 ### `mikit sync-svn`
 
+- `targets` 接受一个或多个 SVN CSS 目录，同一套 `source` 和 `files` 会同步到每个目录。
+- 旧项目仍可使用单字符串 `target`；`target` 和 `targets` 不能同时配置。
+- 所有目标目录会在复制前统一校验；任一目录不存在时，不会向其他目录复制。
+- 重复目标目录会按解析后的绝对路径去重。
 - `files: ["*"]` 或 `files: ["*.css"]` 表示同步 `source` 目录第一层的全部 CSS。
 - 支持 `style*.css`、`phone.css` 等通配或明确文件名，多个规则可组合。
 - 无论通配符如何配置，都不会同步非 CSS 文件。
 - 内容相同的目标文件会跳过；复制后使用 SHA-256 校验。
+- 命令输出中的更新数和跳过数是所有目标目录的累计值。
 - 目标必须是已经存在的 SVN 工作副本目录。命令只复制 CSS，不执行 `svn add`、`svn commit` 或删除操作。
+
+旧版单目录配置仍然有效：
+
+```json
+"syncSvn": {
+  "source": "dist/css",
+  "target": "F:\\SVN\\【简体魔域】\\public\\2026\\08\\hks\\view\\css",
+  "files": ["*"]
+}
+```
 
 ## 项目结构
 
