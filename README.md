@@ -26,7 +26,7 @@ npm install --save-dev mikit-cli
 py -m pip install fonttools brotli
 ```
 
-安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面字符提取还需要本机已安装 Chrome 或 Edge。`playwright-core` 是 Node.js 的 npm 依赖，不是浏览器插件或 Codex 插件；完成动态功能接线后，它应随 `mikit-cli` 的 npm 依赖自动安装，只负责调用本机已有浏览器，不会额外下载浏览器。当前分支尚未在 `package.json` 中登记该依赖。
+安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面字符提取还需要本机已安装 Chrome 或 Edge。`playwright-core` 已登记为 `mikit-cli` 的 npm 依赖，会随全局或本地安装自动安装；它不是浏览器插件或 Codex 插件，只负责调用本机已有浏览器，不会额外下载浏览器。
 
 ## 基本命令
 
@@ -175,7 +175,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--minjs`: 仅压缩 JS
 - `--autoprefixer`: 添加 CSS 前缀
 - `--png`: 构建完成后对实际输出目录执行严格无损 PNG 压缩
-- `--minfont`: 构建完成后开启字体子集化。完成动态功能接线后，如果 `package.json` 配置了 `mikit.font.pages`，同一次字体处理会自动合并动态 URL 字符，不需要额外增加命令行参数。
+- `--minfont`: 构建完成后开启字体子集化。如果 `package.json` 配置了 `mikit.font.pages`，同一次字体处理会自动访问这些动态 URL，并与静态 HTML 字符合并，不需要额外增加命令行参数。
 - `--font-page <page>`: 指定在构建输出目录中用于静态字符扫描的 HTML 页面或 glob（默认：`font.html`）。它只控制静态 HTML 输入，不用于填写动态 URL。
 - `--font-manifest <directory>`: 指定字符清单 TXT 的输出目录（默认：`../font`，相对于项目根目录）。每个提取到字符的本地字体会生成一个同名 TXT，例如 `dist/font/title.ttf` 对应 `../font/title.txt`；该参数不改变压缩后字体文件仍输出到 `dist/font`。字符数为 0 的字体不会生成 TXT。
 
@@ -213,7 +213,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 
 #### 动态页面字符配置
 
-`--minfont` 是开启字体处理的开关，`--font-page` 只指定静态 HTML 扫描范围；动态 URL 不写在 `--font-page` 中，而是统一配置在 `package.json` 的 `mikit.font.pages`。完成最终运行时接线后，执行 `mikit build --minfont` 或 `mikit font` 时会自动读取这些 URL，并将动态字符与静态字符合并。
+`--minfont` 是构建时开启字体处理的开关，`mikit font` 用于处理已有的 `dist`；两者都会自动读取 `package.json` 的 `mikit.font.pages`。`--font-page` 只指定静态 HTML 扫描范围，动态 URL 不写在该参数中。
 
 对于由 Vue/JavaScript、接口数据或 URL 查询参数渲染的文字，可以在项目 `package.json` 中明确列出需要访问的页面。下面的两个 URL 会按配置顺序分别采集，不需要把两个页面状态的文字手工复制到 SHTML：
 
@@ -243,11 +243,9 @@ mikit font --font-page "*.html" --font-manifest "../font"
 - `/index.shtml?...` 会映射到 `dist/index.html` 参与静态补充；其他 `.shtml` 映射到同路径 `.html`，以 `/` 结尾的 URL 映射到 `index.html`。
 - 每页先等待 `domcontentloaded`；配置 `waitFor` 时等待该 CSS 选择器挂载，再额外等待 `wait` 毫秒。单页导航和等待上限由 `timeout` 控制，不使用 `networkidle`。
 - URL 对应的本地服务必须提前运行，例如先启动 `mikit start --port 8080`；字体命令不会自动启动服务。
-- 任一配置页面访问或解析失败时，应在移动、备份或替换字体文件前终止，避免产出只包含部分页面字符的字体包。
-- `browserExecutable: ""` 表示自动查找本机 Chrome/Edge；也可以填写明确的浏览器可执行文件路径，或设置 `MIKIT_BROWSER_EXECUTABLE`。
+- 任一配置页面访问或解析失败时，命令会在移动远程字体、备份本地字体、写入字符清单或替换字体文件之前终止，避免产出只包含部分页面字符的字体包。
+- 浏览器查找顺序固定为：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
 - 这是一套 Mikit 内置工作流，不是 AI 猜字，也不需要为每个 URL 分别安装 Codex/浏览器插件；所有生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和这些页面实际渲染出的 DOM。
-
-> 开发状态：当前分支已经包含运行时配置校验、浏览器采集、同步子进程桥接、URL 到静态 HTML 的映射以及字符合并逻辑；`mikit font` / `mikit build --minfont` 的最终运行时接线和 `playwright-core` npm 依赖登记仍需完成。因此当前版本即使同时使用 `--minfont` 和 `--font-page`，也仍然只会执行静态提取；手动安装 `playwright-core` 也不会让动态 URL 自动生效。
 
 字体依赖的安装命令和适用范围请查看文档开头的“字体压缩依赖（可选）”。
 
