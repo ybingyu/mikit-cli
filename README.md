@@ -244,6 +244,7 @@ mikit font --font-page "*.html" --font-manifest "../font"
 - 每页先等待 `domcontentloaded`；配置 `waitFor` 时等待该 CSS 选择器挂载，再额外等待 `wait` 毫秒。单页导航和等待上限由 `timeout` 控制，不使用 `networkidle`。
 - URL 对应的本地服务必须提前运行，例如先启动 `mikit start --port 8080`；字体命令不会自动启动服务。
 - 任一配置页面访问或解析失败时，命令会在移动远程字体、备份本地字体、写入字符清单或替换字体文件之前终止，避免产出只包含部分页面字符的字体包。
+- 动态页面中的图片、JS、CSS、接口等非字体资源返回 HTTP 错误时不输出日志；字体资源返回 4xx/5xx 时会输出一次状态码和字体 URL。Vue/JavaScript 自身的控制台错误仍会保留。
 - 浏览器查找顺序固定为：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
 - 这是一套 Mikit 内置工作流，不是 AI 猜字，也不需要为每个 URL 分别安装 Codex/浏览器插件；所有生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和这些页面实际渲染出的 DOM。
 

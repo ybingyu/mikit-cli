@@ -55,6 +55,7 @@ function createBrowserHarness({
   };
   let currentUrl = null;
   let consoleListener = null;
+  let responseListener = null;
   let markConsoleListenerReady;
   const consoleListenerReady = new Promise((resolve) => {
     markConsoleListenerReady = resolve;
@@ -62,9 +63,16 @@ function createBrowserHarness({
 
   const page = {
     on(eventName, listener) {
-      assert.equal(eventName, 'console');
-      consoleListener = listener;
-      markConsoleListenerReady();
+      if (eventName === 'console') {
+        consoleListener = listener;
+        markConsoleListenerReady();
+        return;
+      }
+      if (eventName === 'response') {
+        responseListener = listener;
+        return;
+      }
+      assert.fail(`unexpected page event: ${eventName}`);
     },
     async goto(pageUrl, options) {
       currentUrl = pageUrl;
@@ -132,6 +140,14 @@ function createBrowserHarness({
       consoleListener({
         type: () => 'error',
         text: () => message,
+      });
+    },
+    emitResponse({ status, url, resourceType }) {
+      assert.ok(responseListener, 'response listener should be registered');
+      responseListener({
+        status: () => status,
+        url: () => url,
+        request: () => ({ resourceType: () => resourceType }),
       });
     },
   };
@@ -467,6 +483,58 @@ test('collects two explicit URLs in order and warns without failing on console e
     '[mikit font] 页面控制台错误：Vue render warning',
   ]);
   assert.equal(harness.calls.close, 1);
+});
+
+test('reports font 404s once while suppressing non-font resource 404 noise', async () => {
+  const harness = createBrowserHarness({
+    recordsByUrl: {
+      [PAGE_ONE]: [{ text: '动态文字', fontFamily: 'Display' }],
+    },
+  });
+  const warnings = [];
+  const resultPromise = collectRuntimeFontCharacters(
+    {
+      pages: [PAGE_ONE],
+      waitFor: '',
+      wait: 0,
+      timeout: 15000,
+      browserExecutable: 'C:\\Browser\\chrome.exe',
+      fontFamilies: ['Display'],
+    },
+    {
+      chromium: harness.chromium,
+      onWarning: (message) => warnings.push(message),
+    },
+  );
+
+  await harness.waitForConsoleListener();
+  harness.emitConsoleError(
+    'Failed to load resource: the server responded with a status of 404 (Not Found)',
+  );
+  harness.emitResponse({
+    status: 404,
+    url: 'http://example.test/images/missing.png',
+    resourceType: 'image',
+  });
+  harness.emitResponse({
+    status: 404,
+    url: 'http://example.test/font/display.woff2',
+    resourceType: 'font',
+  });
+  harness.emitResponse({
+    status: 404,
+    url: 'http://example.test/font/display.woff2',
+    resourceType: 'font',
+  });
+  harness.emitConsoleError('Vue render warning');
+
+  const result = await resultPromise;
+
+  assert.deepEqual(result, { Display: '动态文字' });
+  assert.deepEqual(warnings, [
+    '[mikit font] 字体资源加载失败：HTTP 404 http://example.test/font/display.woff2',
+    '[mikit font] 页面控制台错误：Vue render warning',
+  ]);
 });
 
 test('wraps page failures with the exact URL and always closes the browser', async (t) => {
