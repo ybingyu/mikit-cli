@@ -71,7 +71,7 @@ function testCreatesPackageJsonInCurrentDirectory() {
       },
       syncSvn: {
         source: 'dist/css',
-        target: '',
+        targets: [],
         files: ['*']
       },
       png: {
