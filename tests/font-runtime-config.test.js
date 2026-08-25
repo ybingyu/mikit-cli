@@ -104,6 +104,34 @@ test('loads and normalizes configured runtime font pages', () => {
   }
 });
 
+test('uses process.cwd and fs.existsSync when options are omitted', () => {
+  const result = validateFontRuntimeConfig({
+    browserExecutable: 'package.json',
+  });
+
+  assert.equal(
+    result.browserExecutable,
+    path.resolve(process.cwd(), 'package.json'),
+  );
+});
+
+test('uses fs.existsSync when only projectDir is provided', () => {
+  const dir = createFixture();
+
+  try {
+    assert.throws(
+      () =>
+        validateFontRuntimeConfig(
+          { browserExecutable: 'missing.exe' },
+          { projectDir: dir },
+        ),
+      /浏览器文件不存在/,
+    );
+  } finally {
+    cleanup(dir, []);
+  }
+});
+
 test('rejects invalid runtime font configuration', () => {
   const dir = createFixture();
   const invalidCases = [
