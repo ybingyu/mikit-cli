@@ -134,7 +134,8 @@ program
       const { syncCssToSvn } = require('../lib/svn-css-sync');
       const summary = syncCssToSvn({ projectDir: process.cwd() });
       console.log(
-        '[mikit sync-svn] 完成：更新 ' + summary.copied +
+        '[mikit sync-svn] 完成：目标 ' + summary.targets.length +
+        ' 个，更新 ' + summary.copied +
         ' 个，跳过 ' + summary.skipped + ' 个。'
       );
     });

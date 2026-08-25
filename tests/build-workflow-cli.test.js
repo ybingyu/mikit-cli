@@ -70,8 +70,10 @@ function testHelpAndMissingConfig() {
 
 function testSuccessfulCommands() {
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-workflow-cli-success-'));
-  const svnCssDir = path.join(fixtureDir, 'svn', 'css');
-  mkdir(svnCssDir);
+  const svnCssDirA = path.join(fixtureDir, 'svn-a', 'css');
+  const svnCssDirB = path.join(fixtureDir, 'svn-b', 'css');
+  mkdir(svnCssDirA);
+  mkdir(svnCssDirB);
 
   const packageJson = {
     name: 'workflow-cli-success',
@@ -101,7 +103,7 @@ function testSuccessfulCommands() {
       },
       syncSvn: {
         source: 'dist/css',
-        target: svnCssDir,
+        targets: [svnCssDirA, svnCssDirB],
         files: ['*']
       }
     }
@@ -133,9 +135,11 @@ function testSuccessfulCommands() {
 
     const sync = run('sync-svn', fixtureDir);
     assert.equal(sync.status, 0, sync.stderr);
-    assert.match(sync.stdout, /更新 1 个，跳过 0 个/);
-    assert.equal(fs.existsSync(path.join(svnCssDir, 'style.css')), true);
-    assert.equal(fs.existsSync(path.join(svnCssDir, 'ignore.txt')), false);
+    assert.match(sync.stdout, /目标 2 个，更新 2 个，跳过 0 个/);
+    assert.equal(fs.existsSync(path.join(svnCssDirA, 'style.css')), true);
+    assert.equal(fs.existsSync(path.join(svnCssDirB, 'style.css')), true);
+    assert.equal(fs.existsSync(path.join(svnCssDirA, 'ignore.txt')), false);
+    assert.equal(fs.existsSync(path.join(svnCssDirB, 'ignore.txt')), false);
   } finally {
     cleanup(
       fixtureDir,
@@ -151,7 +155,8 @@ function testSuccessfulCommands() {
         'packed/css/style.css',
         'packed/css/ignore.txt',
         'packed/js/app.js',
-        'svn/css/style.css'
+        'svn-a/css/style.css',
+        'svn-b/css/style.css'
       ],
       [
         'packed/include',
@@ -163,8 +168,10 @@ function testSuccessfulCommands() {
         'dist/css',
         'dist/js',
         'dist',
-        'svn/css',
-        'svn',
+        'svn-a/css',
+        'svn-a',
+        'svn-b/css',
+        'svn-b',
         '.'
       ]
     );

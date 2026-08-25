@@ -18,8 +18,10 @@ function write(filePath, content) {
 
 function createFixture() {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-workflow-'));
-  const svnCssDir = path.join(projectDir, 'svn-view', 'css');
-  mkdir(svnCssDir);
+  const svnCssDirA = path.join(projectDir, 'svn-view-a', 'css');
+  const svnCssDirB = path.join(projectDir, 'svn-view-b', 'css');
+  mkdir(svnCssDirA);
+  mkdir(svnCssDirB);
 
   const packageJson = {
     name: 'workflow-fixture',
@@ -53,7 +55,7 @@ function createFixture() {
       },
       syncSvn: {
         source: 'dist/css',
-        target: svnCssDir,
+        targets: [svnCssDirA, svnCssDirB],
         files: ['*']
       }
     }
@@ -75,11 +77,11 @@ function createFixture() {
   );
   write(path.join(projectDir, 'wwwroot', 'font-preview.shtml'), 'excluded');
   write(path.join(projectDir, 'wwwroot', 'include', '_rule.shtml'), '<section>rule</section>');
-  write(path.join(svnCssDir, 'phone.css'), '.phone{color:red}');
+  write(path.join(svnCssDirA, 'phone.css'), '.phone{color:red}');
   write(path.join(projectDir, 'packed', 'stale.txt'), 'old package');
   write(path.join(projectDir, 'packed', 'old', 'legacy.css'), '.legacy{}');
 
-  return { projectDir, svnCssDir };
+  return { projectDir, svnCssDirA, svnCssDirB };
 }
 
 function cleanupFixture(projectDir) {
@@ -100,8 +102,10 @@ function cleanupFixture(projectDir) {
     'packed/css/phone.css',
     'packed/css/notes.txt',
     'packed/js/app.js',
-    'svn-view/css/style.css',
-    'svn-view/css/phone.css'
+    'svn-view-a/css/style.css',
+    'svn-view-a/css/phone.css',
+    'svn-view-b/css/style.css',
+    'svn-view-b/css/phone.css'
   ];
 
   files.forEach(relativePath => {
@@ -120,8 +124,10 @@ function cleanupFixture(projectDir) {
     'dist/css',
     'dist/js',
     'dist',
-    'svn-view/css',
-    'svn-view',
+    'svn-view-a/css',
+    'svn-view-a',
+    'svn-view-b/css',
+    'svn-view-b',
     '.'
   ];
 
@@ -131,7 +137,7 @@ function cleanupFixture(projectDir) {
   });
 }
 
-const { projectDir, svnCssDir } = createFixture();
+const { projectDir, svnCssDirA, svnCssDirB } = createFixture();
 
 try {
   const { replaceCssAssets } = require(path.join(repoRoot, 'lib', 'css-replacer'));
@@ -181,14 +187,20 @@ try {
   fs.writeFileSync(packagePath, JSON.stringify(safePackageJson, null, 2), 'utf8');
 
   const syncSummary = syncCssToSvn({ projectDir });
-  assert.equal(syncSummary.copied, 1);
+  assert.equal(syncSummary.copied, 3);
   assert.equal(syncSummary.skipped, 1);
+  assert.deepEqual(syncSummary.targets, [path.resolve(svnCssDirA), path.resolve(svnCssDirB)]);
   assert.deepEqual(syncSummary.files, ['phone.css', 'style.css']);
   assert.equal(
-    fs.readFileSync(path.join(svnCssDir, 'style.css'), 'utf8'),
+    fs.readFileSync(path.join(svnCssDirA, 'style.css'), 'utf8'),
     fs.readFileSync(path.join(projectDir, 'dist', 'css', 'style.css'), 'utf8')
   );
-  assert.equal(fs.existsSync(path.join(svnCssDir, 'notes.txt')), false);
+  assert.equal(
+    fs.readFileSync(path.join(svnCssDirB, 'style.css'), 'utf8'),
+    fs.readFileSync(path.join(projectDir, 'dist', 'css', 'style.css'), 'utf8')
+  );
+  assert.equal(fs.existsSync(path.join(svnCssDirA, 'notes.txt')), false);
+  assert.equal(fs.existsSync(path.join(svnCssDirB, 'notes.txt')), false);
 } finally {
   cleanupFixture(projectDir);
 }
