@@ -149,12 +149,14 @@ program
   .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
   .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
   .action((options) => {
-    const { subsetFonts } = require('../lib/font-subsetter');
-    subsetFonts({
-      projectDir: process.cwd(),
-      output: options.output,
-      fontPage: options.fontPage,
-      fontManifest: options.fontManifest
+    runWorkflowCommand('font', () => {
+      const { subsetFonts } = require('../lib/font-subsetter');
+      subsetFonts({
+        projectDir: process.cwd(),
+        output: options.output,
+        fontPage: options.fontPage,
+        fontManifest: options.fontManifest
+      });
     });
   });
 

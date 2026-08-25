@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
@@ -29,4 +31,31 @@ test("font command exposes standalone subsetting options", () => {
   assert.match(result.stdout, /--output <output>/);
   assert.match(result.stdout, /--font-page <page>/);
   assert.match(result.stdout, /--font-manifest <directory>/);
+});
+
+test("font command formats runtime configuration errors without a stack", (t) => {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "mikit-font-cli-"));
+  const packagePath = path.join(fixtureDir, "package.json");
+  fs.writeFileSync(
+    packagePath,
+    JSON.stringify({ mikit: { font: { pages: "invalid" } } }),
+    "utf8",
+  );
+  t.after(() => {
+    if (fs.existsSync(packagePath)) {
+      fs.unlinkSync(packagePath);
+    }
+    if (fs.existsSync(fixtureDir)) {
+      fs.rmdirSync(fixtureDir);
+    }
+  });
+
+  const result = spawnSync(process.execPath, [cliPath, "font"], {
+    cwd: fixtureDir,
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^\[mikit font\] /m);
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
 });
