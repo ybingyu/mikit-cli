@@ -381,6 +381,36 @@ test("maps CSS family names to their font files", () => {
   assert.equal(plan.fontFamilyByName.get("display"), "Display Serif");
 });
 
+test("removes remote-only font files without creating a backup directory", (t) => {
+  const outputDir = createOutputFixture(t, {
+    files: ["css/site.css", "font/remote.ttf"],
+    directories: ["css", "font"],
+  });
+  const projectDir = path.dirname(outputDir);
+  const fontDir = path.join(outputDir, "font");
+  const cssDir = path.join(outputDir, "css");
+  const remoteFontPath = path.join(fontDir, "remote.ttf");
+
+  fs.mkdirSync(fontDir);
+  fs.mkdirSync(cssDir);
+  fs.writeFileSync(
+    path.join(cssDir, "site.css"),
+    '@font-face{font-family:"Remote";src:url(https://cdn.example.test/remote.ttf)}',
+  );
+  fs.writeFileSync(remoteFontPath, "remote font");
+
+  const result = subsetFonts({
+    projectDir,
+    outputDir: "dist",
+    manifestDir: path.join(outputDir, "manifests"),
+  });
+
+  assert.equal(fs.existsSync(remoteFontPath), false);
+  assert.equal(fs.existsSync(path.join(fontDir, "bak")), false);
+  assert.deepEqual(result.removedRemote, [remoteFontPath]);
+  assert.equal(Object.hasOwn(result, "movedRemote"), false);
+});
+
 
 
 test("ignores formatting-only whitespace when collecting font characters", () => {

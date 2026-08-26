@@ -115,8 +115,11 @@ function createCommandRunner(calls) {
   };
 }
 
-test("merges static and runtime characters before generating every font format", (t) => {
-  const fixture = createFixture(t, { pages: CONFIGURED_PAGES });
+test("merges static and runtime characters without backing up fonts in dist", (t) => {
+  const fixture = createFixture(t, {
+    pages: CONFIGURED_PAGES,
+    includeRemote: true,
+  });
   const runtimeCalls = [];
   const pyftCalls = [];
   const logs = [];
@@ -154,10 +157,8 @@ test("merges static and runtime characters before generating every font format",
   assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.ttf")), true);
   assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff")), true);
   assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff2")), true);
-  assert.equal(
-    fs.existsSync(path.join(fixture.backupDir, "display.ttf")),
-    true,
-  );
+  assert.equal(fs.existsSync(path.join(fixture.fontDir, "remote.ttf")), false);
+  assert.equal(fs.existsSync(fixture.backupDir), false);
   assert.equal(logs.includes("字体静态页面: index.html"), true);
   assert.equal(logs.includes("字体运行时页面: /index.shtml?o=1"), true);
   assert.equal(logs.includes("字体运行时页面: /index.shtml?o=2"), true);

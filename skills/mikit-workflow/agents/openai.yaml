@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mikit 工作流"
+  short_description: "用自然语言配置、执行并验证 Mikit-CLI 工作流"
+  default_prompt: "使用 $mikit-workflow 检查当前项目并完成用户要求的 Mikit 操作。"

@@ -6,29 +6,89 @@ Mikit-CLI 是一个基于 Node.js 的静态网站构建工具，替代传统的 
 
 ## 安装方法
 
-### 全局安装
+### 安装 Mikit-CLI
+
+下面三种方式按使用场景选择一种，不需要重复安装。
+
+**方式一：从 npm 全局安装发布版本**
+
 ```bash
 npm install -g mikit-cli
-npm install -g file:F:\mikit-cli
 ```
 
-### 本地安装
+**方式二：在 Windows 上把本地源码目录安装为全局命令**
+
+```powershell
+npm install -g "file:F:\mikit-cli"
+```
+
+这种方式适合开发或调试 Mikit-CLI；源码修改后，全局 `mikit` 会继续指向该本地目录。
+
+**方式三：作为项目开发依赖安装**
+
 ```bash
-# 在项目目录中
 npm install --save-dev mikit-cli
 ```
 
-### 字体压缩依赖（可选）
+本地依赖通常通过项目的 npm scripts 调用，例如 `npm run build`；也可以使用 `npx mikit --help`。
 
-只有使用 `mikit build --minfont` 或 `mikit font` 时才需要安装 Python fonttools 和 Brotli；普通构建及其他命令不需要这些依赖。
+### 字体子集化依赖（仅字体功能需要）
 
-```bash
+只有使用 `mikit build --minfont` 或 `mikit font` 时才需要 Python 依赖。每个有效字体固定生成 TTF、WOFF、WOFF2，因此建议一次安装 `fonttools` 和 `brotli`：
+
+```powershell
 py -m pip install fonttools brotli
+pyftsubset --help
 ```
 
-安装后需要确保 `pyftsubset` 可以从命令行直接执行。动态页面字符提取还需要本机已安装 Chrome 或 Edge。`playwright-core` 已登记为 `mikit-cli` 的 npm 依赖，会随全局或本地安装自动安装；它不是浏览器插件或 Codex 插件，只负责调用本机已有浏览器，不会额外下载浏览器。
+- `fonttools` 提供字体裁剪命令 `pyftsubset`。
+- `brotli` 用于生成 WOFF2。
+- 普通构建、开发服务器、PNG、替换、打包和 SVN 同步不需要这些 Python 包。
+- 只有 `package.json` 中 `mikit.font.pages` 非空、需要动态 URL 提取时，才需要本机安装 Chrome 或 Edge。
+- `playwright-core` 是 Mikit-CLI 的 npm 依赖，会随 Mikit-CLI 自动安装；它不是浏览器插件或 Codex 插件，也不会下载浏览器，只负责驱动本机已有的 Chrome/Edge。
+
+### 安装 Codex Skill（可选）
+
+`skills/mikit-workflow` 为 Codex 提供自然语言编排层，实际启动、构建、字体裁剪、PNG 压缩、CSS 替换、打包和 SVN 同步仍由 Mikit-CLI 执行。安装 Skill 不能替代上面的 CLI 安装。
+
+在 Mikit-CLI 源码仓库根目录首次安装：
+
+```powershell
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+$skillDest = Join-Path $codexHome "skills\mikit-workflow"
+if (Test-Path -LiteralPath $skillDest) {
+  throw "Skill 已存在，请先确认现有版本：$skillDest"
+}
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $skillDest) | Out-Null
+Copy-Item -LiteralPath ".\skills\mikit-workflow" -Destination $skillDest -Recurse
+```
+
+安装后在下一轮 Codex 对话中可以直接描述需求，例如：
+
+- “帮我给当前项目接入 Mikit。”
+- “构建并压缩 CSS 和 PNG。”
+- “检查配置后把 CSS 同步到 SVN。”
+- “使用 `$mikit-workflow` 处理当前项目的字体子集化。”
+
+Skill 会先检查项目和配置，缺少必要路径、地址或运行环境时会询问，不会自行猜测。仓库同步到 GitHub 后，也可以通过 Codex 的 GitHub Skill 安装方式直接安装 `skills/mikit-workflow` 子目录。
 
 ## 基本命令
+
+### 命令速查
+
+| 命令 | 用途 |
+|------|------|
+| `mikit init` | 在当前目录生成带 Mikit 工作流配置的 `package.json` |
+| `mikit start` | 启动本地开发服务器 |
+| `mikit build` | 从 `wwwroot` 构建生产文件；例如 `mikit build --mincss`（压缩 CSS）、`mikit build --mincss --minfont`（同时处理字体）、`mikit build --output custom-dist --png`（自定义输出并压缩 PNG） |
+| `mikit font` | 直接处理已有构建输出中的本地字体 |
+| `mikit png` | 按 `mikit.png` 配置无损压缩 PNG |
+| `mikit replace` | 按 `mikit.replace` 配置替换构建后 CSS 内容 |
+| `mikit pack` | 按 `mikit.pack` 配置打包 SHTML 和资源 |
+| `mikit sync-svn` | 按 `mikit.syncSvn` 配置同步 CSS 到 SVN 工作副本 |
+| `mikit watch` | 当前仅保留命令入口，尚未实现监听构建 |
+
+使用 `mikit --help` 查看全部命令，使用 `mikit <command> --help` 查看命令选项。
 
 ### 初始化项目配置
 
@@ -45,6 +105,18 @@ mikit init
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
 - `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
+
+`init` 实际生成的字体配置是：
+
+```json
+"font": {
+  "pages": [],
+  "wait": 1000,
+  "timeout": 15000
+}
+```
+
+其中 `pages: []` 表示只做静态 HTML/CSS 扫描，不启动浏览器。`waitFor` 和 `browserExecutable` 是受支持的可选字段，但 `init` 默认不生成，需要动态页面等待或指定浏览器时再手动添加。
 
 如果当前目录已经存在 `package.json`，命令会报错退出并保留原文件，不会覆盖。原来的 `mikit init <project-name>` 项目模板功能已移除。
 
@@ -157,65 +229,88 @@ http://worldcup.y.bindyy.cn:8080/index.shtml
 - 子域名需要能解析到本机，例如通过通配 DNS 或 hosts 配置到 `127.0.0.1`。
 
 ### 2. 构建项目
+
 Mikit-CLI 提供多种构建方式，适用于不同场景：
 
 | 命令 | 命令行 | 功能描述 |
 |------|--------|----------|
-| 基本构建 | `mikit build` | 处理所有文件，编译 SCSS 为 CSS，处理 SSI 指令，不进行压缩 |
+| 基本构建 | `mikit build` | 复制和处理文件，编译 SCSS、展开 SSI，不进行压缩 |
 | 完整压缩 | `mikit build --min` | 执行基本构建，并对 HTML、CSS、JS 进行压缩 |
-| 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅对 CSS 文件进行压缩 |
-| 字体子集化 | `mikit build --minfont` | 构建后按 CSS 字体族提取字符并压缩本地字体 |
-| 无损 PNG 压缩 | `mikit build --png` | 构建完成后递归压缩输出目录中的 PNG，保持像素无损 |
+| 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅压缩 CSS |
+| 字体子集化 | `mikit build --minfont` | 构建后按字体族提取字符并裁剪本地 TTF |
+| 无损 PNG 压缩 | `mikit build --png` | 构建后递归压缩输出目录中的 PNG，保持像素一致 |
 
 **构建选项：**
-- `-o, --output <output>`: 输出目录（默认：dist）
-- `--min`: 压缩所有文件
-- `--minhtml`: 仅压缩 HTML
-- `--mincss`: 仅压缩 CSS
-- `--minjs`: 仅压缩 JS
-- `--autoprefixer`: 添加 CSS 前缀
-- `--png`: 构建完成后对实际输出目录执行严格无损 PNG 压缩
-- `--minfont`: 构建完成后开启字体子集化。如果 `package.json` 配置了 `mikit.font.pages`，同一次字体处理会自动访问这些动态 URL，并与静态 HTML 字符合并，不需要额外增加命令行参数。
-- `--font-page <page>`: 指定在构建输出目录中用于静态字符扫描的 HTML 页面或 glob（默认：`font.html`）。它只控制静态 HTML 输入，不用于填写动态 URL。
-- `--font-manifest <directory>`: 指定字符清单 TXT 的输出目录（默认：`../font`，相对于项目根目录）。每个提取到字符的本地字体会生成一个同名 TXT，例如 `dist/font/title.ttf` 对应 `../font/title.txt`；该参数不改变压缩后字体文件仍输出到 `dist/font`。字符数为 0 的字体不会生成 TXT；如果目录中存在上一次生成的同名 TXT，也会删除该明确文件，避免保留过期字符清单。
+
+- `-o, --output <output>`：输出目录（默认：`dist`）。构建开始时会清空该输出目录。
+- `--min`：压缩 HTML、CSS、JS。
+- `--minhtml`：仅压缩 HTML。
+- `--mincss`：仅压缩 CSS。
+- `--minjs`：仅压缩 JavaScript。
+- `--autoprefixer`：为 CSS 添加浏览器前缀。
+- `--png`：构建后对本次实际输出目录执行严格无损 PNG 压缩。
+- `--minfont`：构建后开启字体子集化；如果 `mikit.font.pages` 非空，会在同一次处理中自动访问动态 URL。
+- `--font-page <page>`：指定相对构建输出目录的静态 HTML 页面或 glob（默认：`font.html`），例如 `pages/*.html`、`**/*.html`。它不用于填写动态 URL。
+- `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`../font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\font`；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
 
 ### 3. 字体子集化
 
-字体子集化读取最终 `dist` 中的 HTML 和 CSS，按实际 `font-family` 继承与覆盖关系为每个本地 TTF 生成独立字符清单，再输出 TTF、WOFF 和 WOFF2。该功能默认关闭。
+字体子集化读取**实际构建输出目录**中的 HTML、CSS 和 `font` 目录。默认输出是 `dist`；使用 `--output custom-dist` 时，字体输入和输出也改为 `custom-dist`，不是固定读取 `dist`。该功能默认关闭。
 
-构建并压缩字体：
+构建并处理字体：
 
 ```bash
 mikit build --mincss --minfont
+mikit build --output custom-dist --mincss --minfont
 ```
 
-仅对已有 `dist` 执行字体处理：
+直接处理已有构建输出：
 
 ```bash
 mikit font
+mikit font --output custom-dist
 ```
 
-自定义扫描页面和字符清单位置：
+自定义静态页面和字符清单目录：
 
 ```bash
-mikit font --font-page "*.html" --font-manifest "../font"
+mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 ```
 
-默认行为：
+> `mikit font` 会直接修改已有构建输出中的字体文件。原始字体以 `wwwroot/font` 为准；构建输出中不再创建 `font/bak`，需要恢复时重新构建即可。
 
-- 优先扫描 `dist/font.html`；不存在时回退到 `dist` 根目录下的 HTML。
-- 扫描 `dist/css` 下全部 CSS，并处理后代选择器、字体继承和子元素覆盖。
-- 静态 HTML 中的字面文本会保留，因此 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中明确写出的各状态文字都可参与提取；Vue 的 `{{ expression }}` 插值表达式本身会被忽略，其实际显示文字由动态 URL 扫描结果补充。
-- 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白会归一为一个空格。
-- 只有提取到至少 1 个字符的本地字体才会生成同名 TXT 清单、备份原始 TTF，并调用 `pyftsubset` 输出 TTF、WOFF、WOFF2。
-- 某字体提取字符数为 0 时，不生成空 TXT，不调用 `pyftsubset`，不备份该字体，并删除上一次遗留的同名 TXT 以及构建输出中该字体同名的 TTF、WOFF、WOFF2，因此最终不会留下任何该字体文件。
-- HTTPS 字体不会压缩；`dist/font` 中仅由 HTTPS 引用的同名字体会移动到 `dist/font/bak`。
+#### 字体输入、映射和输出规则
+
+- 构建输出中必须存在 `font` 目录，否则命令报错。CSS 从同一输出目录的 `css` 目录递归扫描。
+- 只处理同时满足以下条件的字体：文件是 `.ttf`、位于输出目录的 `font` 第一层、并且被 CSS 的本地 `url(...)` 引用。仅把 TTF 放进 `font`、但没有本地 CSS 引用时不会处理。
+- `@font-face` 的 `font-family` 用于把 CSS 字体族映射到实际字体文件；没有映射时回退到 TTF 文件名。`font-family` 有多个候选值时，只使用列表中的第一个字体族。
+- CSS 中的 HTTP/HTTPS 远程字体不做子集化。若输出目录的 `font` 中存在仅由远程 URL 引用的同名字体文件，会直接从构建输出移除；同名字体同时存在本地引用时按本地字体处理。
+- 每个字体分别合并和去重字符，不会把所有字体共用一份字符清单。
+- 提取到至少 1 个字符时：生成同名 TXT，并输出同名 TTF、WOFF、WOFF2；不会在构建输出中备份原始 TTF。
+- 提取字符为 0 时：不生成 TXT、不调用 `pyftsubset`，并删除字符清单目录中的遗留同名 TXT，以及构建输出字体目录中的遗留同名 TTF、WOFF、WOFF2；因此本次构建不会输出该字体的三种格式。
+
+#### 静态 HTML 提取规则
+
+- 默认优先匹配输出目录中的 `font.html`；`--font-page` 没有匹配结果时，回退扫描输出目录根层的 `*.html`。
+- `--font-page` 支持明确文件和 glob，例如 `index.html`、`pages/*.html`、`**/*.html`。匹配结果和动态 URL 映射出的本地 HTML 会去重后共同扫描。
+- 静态 CSS 匹配是轻量实现，不是完整浏览器 CSS 引擎。当前支持标签、ID、class、后代选择器、子选择器、字体继承、规则顺序、选择器优先级、`!important` 和内联 `font-family`；不应依赖复杂属性选择器或兄弟选择器进行字体识别。
+- HTML 中明确写出的字面文本都会参与扫描，包括 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中的各状态文字。
+- Vue 的 `{{ ... }}` 插值表达式会整体忽略，避免把变量名和语法符号误当成页面字符。例如：
+
+```html
+<p>封魔之力达{{fmzl[user.user_type]}} <b>好运次数+2</b></p>
+```
+
+静态扫描只提取字面内容 `封魔之力达 好运次数+2`，不会提取 `fmzl`、`user_type`、`{{`、`[]`、`.` 等表达式内容。插值运行后显示的数字或文字，只能通过 `mikit.font.pages` 的动态页面结果补充；未配置动态 URL 时 Mikit 不会猜测运行值。
+
+- 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白归一为一个空格。
+- 静态扫描忽略 `script` 和 `style` 元素内容，也不从 HTML 属性值中提取文字。
 
 #### 动态页面字符配置
 
-`--minfont` 是构建时开启字体处理的开关，`mikit font` 用于处理已有的 `dist`；两者都会自动读取 `package.json` 的 `mikit.font.pages`。`--font-page` 只指定静态 HTML 扫描范围，动态 URL 不写在该参数中。
+`--minfont` 是构建时开启字体处理的开关，`mikit font` 用于处理已有构建输出；两者都会自动读取当前项目 `package.json` 的 `mikit.font`。**动态 URL 只有写入 `mikit.font.pages` 才会访问**；`--font-page` 只控制静态 HTML 输入，不包含动态提取。
 
-对于由 Vue/JavaScript、接口数据或 URL 查询参数渲染的文字，可以在项目 `package.json` 中明确列出需要访问的页面。下面的两个 URL 会按配置顺序分别采集，不需要把两个页面状态的文字手工复制到 SHTML：
+对于 Vue/JavaScript、接口数据或 URL 查询参数渲染的文字，可以明确列出所有要采集的页面状态。以下域名是不可直接访问的文档示例，必须替换为本机实际 URL：
 
 ```json
 {
@@ -234,21 +329,38 @@ mikit font --font-page "*.html" --font-manifest "../font"
 }
 ```
 
-配置和提取边界：
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `pages` | `[]` | 明确、有序的 HTTP/HTTPS URL 数组；空数组表示不启动浏览器，只做静态扫描。URL 不能包含用户名或密码。 |
+| `waitFor` | `null` | 等待指定 CSS 选择器的元素进入 DOM（`attached`），不要求元素可见。 |
+| `wait` | `1000` | `waitFor` 完成后额外等待的毫秒数，必须是非负整数。 |
+| `timeout` | `15000` | 每页导航和 `waitFor` 的超时毫秒数，必须是正整数。 |
+| `browserExecutable` | `null` | Chrome/Edge 可执行文件路径；相对路径按项目根目录解析。省略或空字符串表示自动查找。 |
 
-- `pages` 必须是明确、有序的 HTTP/HTTPS URL 数组。Mikit 只访问列出的 URL，不猜测 `o` 等参数值，也不会自动点击按钮切换状态。
-- 缺少 `mikit.font`、缺少 `pages` 或配置为空数组时，保持原来的纯静态扫描，不启动浏览器。
-- 静态扫描负责保留模板中明确写出的全部按钮/面板状态；运行时扫描补充 Vue、JavaScript、接口或 query 参数实际渲染到 DOM 的文字，最后按字体族合并并去重。
-- 运行时会读取 DOM 文本，包括隐藏 DOM 中的文字；忽略 `script`、`style`、`noscript`，不扫描 JavaScript 源码字符串，也不提取 `::before`/`::after` 生成内容。
-- `/index.shtml?...` 会映射到 `dist/index.html` 参与静态补充；其他 `.shtml` 映射到同路径 `.html`，以 `/` 结尾的 URL 映射到 `index.html`。
-- 每页先等待 `domcontentloaded`；配置 `waitFor` 时等待该 CSS 选择器挂载，再额外等待 `wait` 毫秒。单页导航和等待上限由 `timeout` 控制，不使用 `networkidle`。
-- URL 对应的本地服务必须提前运行，例如先启动 `mikit start --port 8080`；字体命令不会自动启动服务。
-- 任一配置页面访问或解析失败时，命令会在移动远程字体、备份本地字体、写入字符清单或替换字体文件之前终止，避免产出只包含部分页面字符的字体包。
-- 动态页面中的图片、JS、CSS、接口等非字体资源返回 HTTP 错误时不输出日志；字体资源返回 4xx/5xx 时会输出一次状态码和字体 URL。Vue/JavaScript 自身的控制台错误仍会保留。
-- 浏览器查找顺序固定为：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
-- 这是一套 Mikit 内置工作流，不是 AI 猜字，也不需要为每个 URL 分别安装 Codex/浏览器插件；所有生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和这些页面实际渲染出的 DOM。
+`mikit init` 默认只生成 `pages`、`wait`、`timeout`；`waitFor` 和 `browserExecutable` 需要时手动添加。
 
-字体依赖的安装命令和适用范围请查看文档开头的“字体压缩依赖（可选）”。
+#### 动态提取边界和失败处理
+
+- Mikit 只按数组顺序访问明确列出的 URL，不猜测 query 参数值，也不会自动点击按钮切换状态；需要采集多个状态时，应逐个列出 URL。
+- URL 对应的本地服务必须提前启动，例如先运行 `mikit start --port 8080`；字体命令不会自动启动服务。
+- 每页依次执行 `domcontentloaded → waitFor（如有）→ wait`，不使用 `networkidle`。
+- 运行时读取 `document.body` 中的文本节点，并按文本父元素计算后的第一个 `font-family` 归类；隐藏 DOM 也会读取。
+- 运行时忽略 `script`、`style`、`noscript`，不读取 JavaScript 源码、HTML 属性值和 `::before`/`::after` 伪元素内容。
+- `.shtml` URL 会映射到构建输出中的同路径 `.html` 作为静态补充；以 `/` 结尾的 URL 映射到 `index.html`。无法映射或本地文件不存在时会警告，动态 URL 本身仍会访问；但整个任务仍需至少找到一个静态 HTML 扫描页面。
+- 任一页面导航、HTTP 主文档状态、等待或解析失败时，任务会在删除远程字体构建副本、写入清单和替换字体文件之前终止，避免生成只覆盖部分页面状态的字体包。
+
+#### 页面错误日志规则
+
+- 主页面返回 HTTP 4xx/5xx 时，该页面提取失败并终止字体任务。
+- 图片、CSS、JavaScript、接口等非字体资源返回 HTTP 4xx/5xx 时不输出日志。
+- 字体资源返回 HTTP 4xx/5xx 时输出状态码和完整 URL；相同“状态码 + URL”只输出一次。
+- 其他 Vue/JavaScript `console.error` 仍会输出，便于发现页面逻辑错误。
+
+#### 浏览器查找顺序
+
+依次使用：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
+
+这是一套 Mikit 内置的确定性工具流程，不是 AI 猜字，也不需要为每个 URL 分别安装插件。生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和页面实际渲染出的 DOM。
 
 ## 核心功能
 
@@ -263,14 +375,15 @@ mikit font --font-page "*.html" --font-manifest "../font"
 - 支持嵌套导入和变量
 
 ### 3. 热更新
-- 使用 LiveReload 实现实时预览
-- 支持 HTML、CSS、JS 文件的热更新
-- 无需手动刷新浏览器
+- 开发页面会注入项目级轮询脚本，每秒查询当前项目的更新状态。
+- CSS 变更优先刷新对应样式表；HTML、JavaScript 等其他文件变更时刷新页面。
+- 多项目共用端口时，变更只通知所属项目，不会刷新其他子域名。
 
 ### 4. 构建优化
-- 文件压缩（HTML、CSS、JS）
-- CSS 自动前缀（通过 autoprefixer）
-- 智能文件过滤（跳过 `_` 前缀文件）
+- 可选压缩 HTML、CSS、JavaScript。
+- 可选通过 autoprefixer 添加 CSS 前缀。
+- SCSS 中 `_` 前缀文件作为 partial，不单独输出；`include` 目录中 `_` 前缀文件不会直接复制到构建目录。
+- 可在构建完成后继续执行字体子集化和严格无损 PNG 压缩。
 
 ### 5. 子域名匹配机制
 - 支持通过子域名访问不同项目
@@ -402,12 +515,16 @@ npm run sync:svn
     },
     "font": {
       "pages": [],
+      "waitFor": null,
       "wait": 1000,
-      "timeout": 15000
+      "timeout": 15000,
+      "browserExecutable": ""
     }
   }
 }
 ```
+
+上面的 `font` 展示了全部受支持字段；`mikit init` 默认不会生成 `waitFor` 和 `browserExecutable`。
 
 ### `mikit replace`
 
@@ -529,19 +646,54 @@ project/
 ## 常见问题
 
 ### 1. 端口被占用
-如果遇到端口被占用的错误，可以使用 `--port` 选项指定其他端口：
+
+如果开发服务器端口被占用，可指定其他端口：
+
 ```bash
 mikit start --port 8085
 ```
 
+如果提示 LiveReload 的 35730 端口已占用，Mikit 会尝试复用已有服务；当前页面刷新主要依赖同一开发服务器上的 `/hot-update-status`。
+
 ### 2. 热更新不生效
-确保：
-- 浏览器支持 LiveReload
-- 没有防火墙阻止 LiveReload 端口（35730）
-- 文件路径正确，没有特殊字符
+
+依次检查：
+
+- 当前访问的是 `wwwroot` 开发页面，而不是不注入热更新脚本的 `/dist/`。
+- 页面源码中存在 `id="mikit-hot-reload"` 的脚本。
+- 浏览器能请求当前域名下的 `/hot-update-status?project=...`。
+- 子域名与 alias/自动扫描出的项目 ID 一致，文件确实位于该项目的 `wwwroot`。
+- 终端是否输出了文件变化和热更新通知日志。
 
 ### 3. SCSS 编译错误
-检查 SCSS 语法是否正确，特别是嵌套和变量使用。
+
+检查 SCSS 语法、导入路径、变量和嵌套关系。构建时的错误会显示源文件路径。
+
+### 4. 找不到 `pyftsubset`
+
+确认已经执行：
+
+```powershell
+py -m pip install fonttools brotli
+pyftsubset --help
+```
+
+如果安装成功但命令仍找不到，请将 Python 的 Scripts 目录加入 `PATH`，重新打开终端后再验证。
+
+### 5. 动态文字没有进入字符清单
+
+检查以下项目：
+
+- 命令包含 `--minfont`，或使用的是独立命令 `mikit font`。
+- URL 写在 `package.json > mikit.font.pages`，而不是写进 `--font-page`。
+- 本地服务已启动，URL 能在 Chrome/Edge 中访问。
+- 页面需要的状态 URL 已逐个列出；Mikit 不自动猜参数或点击按钮。
+- 如果数据异步渲染，配置正确的 `waitFor` 和足够的 `wait`。
+- 页面文字最终使用的第一个计算字体族，能映射到待处理的本地 TTF。
+
+### 6. 动态页面出现 404 时为什么没有日志
+
+非字体图片、CSS、JavaScript、接口等资源的 HTTP 错误会被静默忽略；字体资源的 4xx/5xx 会输出状态码和完整 URL。主页面本身返回 4xx/5xx 会使字体任务失败。
 
 ## 高级功能
 
