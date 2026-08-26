@@ -190,15 +190,6 @@ program
     });
   });
 
-// 监视命令
-program
-  .command('watch')
-  .description('Watch files for changes and rebuild')
-  .option('-r, --root <root>', 'Root directory (default: .)', '.')
-  .action((options) => {
-    console.log('Watch mode is not yet implemented');
-  });
-
 // 帮助命令
 program
   .command('help')

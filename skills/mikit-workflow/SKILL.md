@@ -45,8 +45,6 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 | Convert SHTML includes and collect configured assets | `mikit pack` |
 | Copy configured direct CSS files to SVN working copies | `mikit sync-svn` |
 
-Do not use `mikit watch` as a completed workflow; its command entry currently does not implement watching.
-
 ## Configure Minimally
 
 - `mikit init` refuses to overwrite an existing `package.json`. If one already exists, inspect it and merge only the required scripts and `mikit` sections.

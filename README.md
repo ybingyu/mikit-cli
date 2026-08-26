@@ -18,11 +18,16 @@ npm install -g mikit-cli
 
 **方式二：在 Windows 上把本地源码目录安装为全局命令**
 
+新克隆的源码必须先安装项目依赖，再建立全局命令链接：
+
 ```powershell
+Set-Location "F:\mikit-cli"
+npm ci
 npm install -g "file:F:\mikit-cli"
+mikit --help
 ```
 
-这种方式适合开发或调试 Mikit-CLI；源码修改后，全局 `mikit` 会继续指向该本地目录。
+`npm ci` 会严格按照 `package-lock.json` 把运行依赖安装到源码目录的 `node_modules`。`npm install -g "file:..."` 适合开发或调试，它建立的是指向源码目录的全局链接，不会代替源码目录安装依赖；如果跳过 `npm ci`，运行时可能出现 `Cannot find module 'commander'`。源码修改后，全局 `mikit` 会继续指向该本地目录。
 
 **方式三：作为项目开发依赖安装**
 
@@ -86,7 +91,6 @@ Skill 会先检查项目和配置，缺少必要路径、地址或运行环境�
 | `mikit replace` | 按 `mikit.replace` 配置替换构建后 CSS 内容 |
 | `mikit pack` | 按 `mikit.pack` 配置打包 SHTML 和资源 |
 | `mikit sync-svn` | 按 `mikit.syncSvn` 配置同步 CSS 到 SVN 工作副本 |
-| `mikit watch` | 当前仅保留命令入口，尚未实现监听构建 |
 
 使用 `mikit --help` 查看全部命令，使用 `mikit <command> --help` 查看命令选项。
 
