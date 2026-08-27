@@ -516,6 +516,76 @@ test("removes a stale manifest for a zero-character font", (t) => {
   assert.equal(fs.existsSync(manifestDir), true);
 });
 
+test("writes default manifests to the project font directory", (t) => {
+  const fixtureRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), "mikit-default-font-manifest-"),
+  );
+  const projectDir = path.join(fixtureRoot, "project");
+  const outputDir = path.join(projectDir, "dist");
+  const cssDir = path.join(outputDir, "css");
+  const outputFontDir = path.join(outputDir, "font");
+  const manifestDir = path.join(projectDir, "font");
+  const previousDefaultDir = path.join(fixtureRoot, "font");
+  const manifestPath = path.join(manifestDir, "display.txt");
+  const previousDefaultPath = path.join(previousDefaultDir, "display.txt");
+
+  fs.mkdirSync(cssDir, { recursive: true });
+  fs.mkdirSync(outputFontDir);
+  fs.writeFileSync(
+    path.join(outputDir, "font.html"),
+    '<div class="display">示例文字</div>',
+  );
+  fs.writeFileSync(
+    path.join(cssDir, "site.css"),
+    [
+      '@font-face{font-family:"Display";src:url(../font/display.ttf)}',
+      '.display{font-family:"Display"}',
+    ].join(""),
+  );
+  fs.writeFileSync(path.join(outputFontDir, "display.ttf"), "source font");
+
+  t.after(() => {
+    [
+      manifestPath,
+      previousDefaultPath,
+      path.join(outputFontDir, "display.ttf"),
+      path.join(outputFontDir, "display.woff"),
+      path.join(outputFontDir, "display.woff2"),
+      path.join(cssDir, "site.css"),
+      path.join(outputDir, "font.html"),
+    ].forEach((filePath) => {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    });
+    [
+      manifestDir,
+      previousDefaultDir,
+      outputFontDir,
+      cssDir,
+      outputDir,
+      projectDir,
+      fixtureRoot,
+    ].forEach((directoryPath) => {
+      if (fs.existsSync(directoryPath)) fs.rmdirSync(directoryPath);
+    });
+  });
+
+  subsetFonts({
+    projectDir,
+    outputDir: "dist",
+    commandRunner(command, args) {
+      const outputArgument = args.find((argument) =>
+        argument.startsWith("--output-file="),
+      );
+      fs.writeFileSync(outputArgument.slice("--output-file=".length), "subset");
+      return { status: 0 };
+    },
+  });
+
+  assert.equal(fs.existsSync(manifestPath), true);
+  assert.equal(fs.readFileSync(manifestPath, "utf8"), "示例文字");
+  assert.equal(fs.existsSync(previousDefaultPath), false);
+});
+
 test("passes a manifest path instead of inline Unicode", () => {
   const args = createPyftsubsetArgs({
     fontPath: "C:\\project\\dist\\font\\local.ttf",

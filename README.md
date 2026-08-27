@@ -255,7 +255,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--png`：构建后对本次实际输出目录执行严格无损 PNG 压缩。
 - `--minfont`：构建后开启字体子集化；如果 `mikit.font.pages` 非空，会在同一次处理中自动访问动态 URL。
 - `--font-page <page>`：指定相对构建输出目录的静态 HTML 页面或 glob（默认：`font.html`），例如 `pages/*.html`、`**/*.html`。它不用于填写动态 URL。
-- `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`../font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\font`；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
+- `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\site\font`，与 `wwwroot`、`dist` 同级；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
 
 ### 3. 字体子集化
 

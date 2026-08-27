@@ -20,7 +20,10 @@ test("build exposes optional font subsetting flags", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /--minfont/);
   assert.match(result.stdout, /--font-page <page>/);
-  assert.match(result.stdout, /--font-manifest <directory>/);
+  assert.match(
+    result.stdout,
+    /--font-manifest <directory>[\s\S]*?\(default: "font"\)/,
+  );
 });
 
 test("font command exposes standalone subsetting options", () => {
@@ -30,7 +33,10 @@ test("font command exposes standalone subsetting options", () => {
   assert.match(result.stdout, /Subset local fonts from built HTML and CSS/);
   assert.match(result.stdout, /--output <output>/);
   assert.match(result.stdout, /--font-page <page>/);
-  assert.match(result.stdout, /--font-manifest <directory>/);
+  assert.match(
+    result.stdout,
+    /--font-manifest <directory>[\s\S]*?\(default: "font"\)/,
+  );
 });
 
 test("font command formats runtime configuration errors without a stack", (t) => {

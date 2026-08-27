@@ -63,7 +63,7 @@ program
   .option('--autoprefixer', 'Add CSS prefixes', false)
   .option('--minfont', 'Subset local fonts using built HTML and CSS', false)
   .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
-  .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
+  .option('--font-manifest <directory>', 'Font manifest directory relative to project', 'font')
   .action((options) => {
     runWorkflowCommand('build', () => {
       const builder = require('../lib/builder');
@@ -147,7 +147,7 @@ program
   .description('Subset local fonts from built HTML and CSS')
   .option('-o, --output <output>', 'Build output directory (default: dist)', 'dist')
   .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
-  .option('--font-manifest <directory>', 'Font manifest directory relative to project', '../font')
+  .option('--font-manifest <directory>', 'Font manifest directory relative to project', 'font')
   .action((options) => {
     runWorkflowCommand('font', () => {
       const { subsetFonts } = require('../lib/font-subsetter');
