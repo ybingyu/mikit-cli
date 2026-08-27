@@ -76,6 +76,8 @@ function testCreatesPackageJsonInCurrentDirectory() {
       },
       png: {
         root: 'dist',
+        mode: 'quantize',
+        colors: 256,
         level: 'balanced',
         exclude: []
       },

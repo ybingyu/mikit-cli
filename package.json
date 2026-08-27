@@ -30,6 +30,7 @@
     "html-minifier": "^4.0.0",
     "node-sass": "^9.0.0",
     "playwright-core": "^1.48.2",
+    "pngquant-bin": "^9.0.0",
     "postcss": "^8.4.32",
     "terser": "^5.26.0",
     "tiny-lr": "^2.0.0"

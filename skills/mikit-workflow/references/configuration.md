@@ -51,18 +51,23 @@ Important flags:
 - `--minhtml`, `--mincss`, `--minjs`: selective minification.
 - `--png`: lossless PNG optimization during build.
 - `--autoprefixer`: add CSS prefixes.
-- `--minfont`: subset local fonts after building.
+- `--minfont`: subset local fonts after building. By default, recursively discover `wwwroot/**/*.shtml`, exclude files whose basename starts with `_`, and scan their same-path `.html` build outputs.
+- `--font-page <page>`: override the default static SHTML discovery with an output-relative HTML file or glob. It is not a dynamic URL option.
 
 The build replaces its output directory. Do not put manually maintained source files there.
 
-## Font Runtime Collection
+## Font Static and Runtime Collection
+
+Static collection is automatic: Mikit recursively discovers `wwwroot/**/*.shtml`, excludes files whose basename starts with `_`, and scans the corresponding same-path `.html` files in the build output. A dedicated `font.shtml` is not required. Use `--font-page` only when the consumer project needs to override this default page set.
+
+Dynamic collection is separate and supplements static results. Configure rendered HTTP/HTTPS pages in `mikit.font.pages`; an empty array or omitted `pages` keeps the browser from starting.
 
 ```json
 {
   "mikit": {
     "font": {
       "pages": [
-        "http://project.y.bindyy.cn:8080/index.shtml?state=1"
+        "http://site.example.test:8080/index.shtml?state=1"
       ],
       "waitFor": ".page-ready",
       "wait": 1000,

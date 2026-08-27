@@ -62,7 +62,7 @@ program
   .option('--png', 'Optimize PNG images', false)
   .option('--autoprefixer', 'Add CSS prefixes', false)
   .option('--minfont', 'Subset local fonts using built HTML and CSS', false)
-  .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
+  .option('--font-page <page>', 'Override automatic SHTML scan with built HTML page or glob')
   .option('--font-manifest <directory>', 'Font manifest directory relative to project', 'font')
   .action((options) => {
     runWorkflowCommand('build', () => {
@@ -83,7 +83,7 @@ program
   });
 
 
-// 严格无损压缩 PNG 图片
+// 按配置量化或严格无损压缩 PNG 图片
 program
   .command('png')
   .description('Optimize PNG images using package.json mikit.png config')
@@ -146,7 +146,7 @@ program
   .command('font')
   .description('Subset local fonts from built HTML and CSS')
   .option('-o, --output <output>', 'Build output directory (default: dist)', 'dist')
-  .option('--font-page <page>', 'Font scan page or glob relative to output', 'font.html')
+  .option('--font-page <page>', 'Override automatic SHTML scan with built HTML page or glob')
   .option('--font-manifest <directory>', 'Font manifest directory relative to project', 'font')
   .action((options) => {
     runWorkflowCommand('font', () => {

@@ -8,7 +8,9 @@ const zlib = require('zlib');
 
 const {
   optimizePngImages,
+  validatePngConfig,
   formatBytes,
+  formatPngSummary,
   PNG_LEVEL_OPTIONS
 } = require('../lib/png-optimizer');
 
@@ -200,11 +202,14 @@ function testDiscoveryAndExclusions() {
 
     const summary = optimizePngImages({
       projectDir,
-      compressPng(input) {
+      quantizePng(input, options) {
+        assert.equal(options.colors, 256);
         return input.subarray(0, input.length - 1);
       }
     });
 
+    assert.equal(summary.mode, 'quantize');
+    assert.equal(summary.colors, 256);
     assert.equal(summary.scanned, 4);
     assert.equal(summary.excluded, 2);
     assert.equal(summary.optimized, 2);
@@ -239,7 +244,7 @@ function testPresetMappingsAndUnchangedFiles() {
     let receivedOptions;
 
     try {
-      writePackage(projectDir, { root: 'dist', level, exclude: [] });
+      writePackage(projectDir, { root: 'dist', mode: 'lossless', level, exclude: [] });
       write(path.join(projectDir, 'dist/a.png'), original);
 
       const summary = optimizePngImages({
@@ -265,9 +270,52 @@ function testPresetMappingsAndUnchangedFiles() {
   assert.equal(formatBytes(438630), '428.35 KB');
 }
 
+function testQuantizeDefaultsAndColorRange() {
+  assert.deepEqual(validatePngConfig({ root: 'dist', exclude: [] }), {
+    root: 'dist',
+    mode: 'quantize',
+    colors: 256,
+    level: 'balanced',
+    exclude: []
+  });
+
+  for (const colors of [2, 256]) {
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), `mikit-png-colors-${colors}-`));
+    const original = Buffer.from([1, 2, 3, 4]);
+    let receivedOptions;
+
+    try {
+      writePackage(projectDir, { root: 'dist', mode: 'quantize', colors, exclude: [] });
+      write(path.join(projectDir, 'dist/a.png'), original);
+      const summary = optimizePngImages({
+        projectDir,
+        quantizePng(input, options) {
+          receivedOptions = options;
+          return Buffer.concat([input, Buffer.from([5])]);
+        }
+      });
+
+      assert.equal(receivedOptions.colors, colors);
+      assert.equal(summary.mode, 'quantize');
+      assert.equal(summary.colors, colors);
+      assert.equal(summary.optimized, 0);
+      assert.equal(summary.unchanged, 1);
+      assert.deepEqual(fs.readFileSync(path.join(projectDir, 'dist/a.png')), original);
+      assert.match(formatPngSummary(summary), new RegExp(`量化 ${colors} 色`));
+    } finally {
+      cleanup(projectDir, ['package.json', 'dist/a.png'], ['dist', '.']);
+    }
+  }
+}
+
+
 function testInvalidConfiguration() {
   const cases = [
-    [{ root: 'dist', level: 'ultra', exclude: [] }, /mikit\.png\.level/],
+    [{ root: 'dist', mode: 'unknown', level: 'balanced', exclude: [] }, /mikit\.png\.mode/],
+    [{ root: 'dist', mode: 'quantize', colors: 1, exclude: [] }, /mikit\.png\.colors/],
+    [{ root: 'dist', mode: 'quantize', colors: 257, exclude: [] }, /mikit\.png\.colors/],
+    [{ root: 'dist', mode: 'quantize', colors: 128.5, exclude: [] }, /mikit\.png\.colors/],
+    [{ root: 'dist', mode: 'lossless', level: 'ultra', exclude: [] }, /mikit\.png\.level/],
     [{ root: 'dist', level: 'balanced', exclude: '**/*.png' }, /mikit\.png\.exclude/],
     [{ root: 'dist', level: 'balanced', exclude: [123] }, /mikit\.png\.exclude\[\]/],
     [{ root: '', level: 'balanced', exclude: [] }, /mikit\.png\.root/]
@@ -292,13 +340,40 @@ function testInvalidConfiguration() {
   }
 }
 
+function testRealQuantizeCompression() {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-quantize-real-'));
+  const original = createUncompressedRgbaPng(64, 64);
+  const pngPath = path.join(projectDir, 'dist/img/real.png');
+
+  try {
+    writePackage(projectDir, { root: 'dist', mode: 'quantize', colors: 256, exclude: [] });
+    write(pngPath, original);
+
+    const summary = optimizePngImages({ projectDir });
+    const optimized = fs.readFileSync(pngPath);
+    const chunks = parsePng(optimized);
+    const ihdr = chunks.find(chunk => chunk.type === 'IHDR').data;
+    const palette = chunks.find(chunk => chunk.type === 'PLTE');
+
+    assert.equal(ihdr[9], 3, 'quantized PNG should use an indexed palette');
+    assert.ok(palette, 'quantized PNG should contain a palette');
+    assert.ok(palette.data.length / 3 <= 256);
+    assert.ok(optimized.length < original.length);
+    assert.equal(summary.mode, 'quantize');
+    assert.equal(summary.colors, 256);
+    assert.equal(summary.optimized, 1);
+  } finally {
+    cleanup(projectDir, ['package.json', 'dist/img/real.png'], ['dist/img', 'dist', '.']);
+  }
+}
+
 function testRealLosslessCompressionAndErrors() {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-real-'));
   const original = createUncompressedRgbaPng();
   const pngPath = path.join(projectDir, 'dist/img/real.png');
 
   try {
-    writePackage(projectDir, { root: 'dist', level: 'max', exclude: [] });
+    writePackage(projectDir, { root: 'dist', mode: 'lossless', level: 'max', exclude: [] });
     write(pngPath, original);
 
     const beforePixels = decodeRgba8Png(original);
@@ -316,7 +391,7 @@ function testRealLosslessCompressionAndErrors() {
 
   const invalidProjectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-invalid-file-'));
   try {
-    writePackage(invalidProjectDir, { root: 'dist', level: 'balanced', exclude: [] });
+    writePackage(invalidProjectDir, { root: 'dist', mode: 'lossless', level: 'balanced', exclude: [] });
     write(path.join(invalidProjectDir, 'dist/img/broken.png'), Buffer.from('not a png'));
     assert.throws(
       () => optimizePngImages({ projectDir: invalidProjectDir }),
@@ -333,5 +408,7 @@ function testRealLosslessCompressionAndErrors() {
 
 testDiscoveryAndExclusions();
 testPresetMappingsAndUnchangedFiles();
+testQuantizeDefaultsAndColorRange();
 testInvalidConfiguration();
+testRealQuantizeCompression();
 testRealLosslessCompressionAndErrors();

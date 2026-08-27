@@ -126,6 +126,24 @@ test("ignores Vue interpolation expressions while retaining surrounding text", (
   });
 });
 
+test("ignores Vue binding expressions containing greater-than operators", () => {
+  const characters = collectFontCharacters({
+    htmlContents: [
+      '<div class="hover" :class="{\'active\':isHover,\'big\':hoverTxt.length>20}" :style="{left:hoverLeft + \'px\',top:hoverTop + \'px\'}"><p v-html="hoverTxt"></p><span>静态提示</span></div>',
+    ],
+    cssFiles: [
+      {
+        content: '.hover{font-family:"Display"}',
+      },
+    ],
+    fontFamilies: new Set(["Display"]),
+  });
+
+  assert.deepEqual(characters, {
+    Display: "静态提示",
+  });
+});
+
 test("derives local HTML targets from runtime URLs", (t) => {
   const outputDir = createOutputFixture(t);
 
@@ -174,6 +192,65 @@ test("merges planned font character maps in map and code point order", () => {
     Display: "甲乙😀丙丁",
     Unused: "",
   });
+});
+
+test("discovers built HTML for every non-private SHTML page by default", (t) => {
+  const projectDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "mikit-font-shtml-pages-"),
+  );
+  const sourceDir = path.join(projectDir, "wwwroot");
+  const outputDir = path.join(projectDir, "dist");
+  const sourcePagesDir = path.join(sourceDir, "pages");
+  const sourceIncludeDir = path.join(sourceDir, "include");
+  const outputPagesDir = path.join(outputDir, "pages");
+  const outputIncludeDir = path.join(outputDir, "include");
+  const sourceFiles = [
+    path.join(sourceDir, "index.shtml"),
+    path.join(sourcePagesDir, "detail.shtml"),
+    path.join(sourceDir, "_font.shtml"),
+    path.join(sourceIncludeDir, "_popup.shtml"),
+    path.join(sourceDir, "plain.html"),
+  ];
+  const outputFiles = [
+    path.join(outputDir, "index.html"),
+    path.join(outputPagesDir, "detail.html"),
+    path.join(outputDir, "_font.html"),
+    path.join(outputIncludeDir, "_popup.html"),
+    path.join(outputDir, "plain.html"),
+  ];
+
+  [sourcePagesDir, sourceIncludeDir, outputPagesDir, outputIncludeDir].forEach(
+    (directoryPath) => fs.mkdirSync(directoryPath, { recursive: true }),
+  );
+  sourceFiles.forEach((filePath) => fs.writeFileSync(filePath, "source"));
+  outputFiles.forEach((filePath) => fs.writeFileSync(filePath, "built"));
+
+  t.after(() => {
+    [...sourceFiles, ...outputFiles].forEach((filePath) => {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    });
+    [
+      sourcePagesDir,
+      sourceIncludeDir,
+      sourceDir,
+      outputPagesDir,
+      outputIncludeDir,
+      outputDir,
+      projectDir,
+    ].forEach((directoryPath) => {
+      if (fs.existsSync(directoryPath)) fs.rmdirSync(directoryPath);
+    });
+  });
+
+  const targets = collectHtmlTargets({ sourceDir, outputDir });
+
+  assert.deepEqual(
+    new Set(targets),
+    new Set([
+      path.resolve(outputDir, "index.html"),
+      path.resolve(outputDir, "pages", "detail.html"),
+    ]),
+  );
 });
 
 test("collects configured static and deduplicated runtime HTML targets", (t) => {

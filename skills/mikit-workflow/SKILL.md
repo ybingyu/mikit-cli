@@ -49,6 +49,7 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 
 - `mikit init` refuses to overwrite an existing `package.json`. If one already exists, inspect it and merge only the required scripts and `mikit` sections.
 - Keep paths relative to the consumer project when practical. In JSON on Windows, prefer `/` or escaped `\\` separators.
+- For font subsetting, keep the default static discovery unless the user explicitly needs a narrower page set: Mikit scans `wwwroot/**/*.shtml`, excludes files whose basename starts with `_`, and maps each source page to the same-path `.html` in the build output. Use `--font-page` only to override this static discovery; do not require a dedicated `font.shtml`.
 - Do not enable optional font browser scanning unless the user needs dynamic-page text collection.
 - Preserve legacy `mikit.syncSvn.target` when it is already valid. Use `targets` for multiple destinations, and never configure both fields.
 - Interpret `mikit.syncSvn.files: ["*"]` as direct CSS files only, not arbitrary files or recursive content.
@@ -72,5 +73,18 @@ After a mutating command:
 5. For font subsetting, verify the expected TTF, WOFF, and WOFF2 outputs when fonts were processed.
 6. For SVN synchronization, report target count and copied/skipped counts; do not claim an SVN commit occurred.
 7. Run proportionate syntax, project tests, or `git diff --check` when repository files were changed.
+
+### Report PNG Results Consistently
+
+After `mikit png` or `mikit build --png`, report:
+
+- The exact command and effective PNG root.
+- The effective mode: `quantize` with its color count, or `lossless` with its level.
+- The CLI summary counts for scanned, optimized, excluded, and unchanged files.
+- The total bytes saved, using the CLI-formatted value.
+- A representative artifact check when files were optimized. Identify the checked PNG and confirm it still exists and is readable; include before/after sizes only when they were actually captured.
+- Any command failure or remaining prerequisite. If no file became smaller, say so explicitly instead of implying compression changed files.
+
+Treat the Mikit CLI summary as the source of truth for totals. Do not invent per-file savings, and do not describe quantization as lossless.
 
 Report what was changed, which command ran, what was verified, and any remaining manual prerequisite.

@@ -87,7 +87,7 @@ Skill 会先检查项目和配置，缺少必要路径、地址或运行环境�
 | `mikit start` | 启动本地开发服务器 |
 | `mikit build` | 从 `wwwroot` 构建生产文件；例如 `mikit build --mincss`（压缩 CSS）、`mikit build --mincss --minfont`（同时处理字体）、`mikit build --output custom-dist --png`（自定义输出并压缩 PNG） |
 | `mikit font` | 直接处理已有构建输出中的本地字体 |
-| `mikit png` | 按 `mikit.png` 配置无损压缩 PNG |
+| `mikit png` | 按 `mikit.png` 配置压缩 PNG；默认使用 Imagine 风格的 256 色量化，也可切换严格无损 |
 | `mikit replace` | 按 `mikit.replace` 配置替换构建后 CSS 内容 |
 | `mikit pack` | 按 `mikit.pack` 配置打包 SHTML 和资源 |
 | `mikit sync-svn` | 按 `mikit.syncSvn` 配置同步 CSS 到 SVN 工作副本 |
@@ -109,6 +109,7 @@ mikit init
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
 - `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
+- `mikit.png` 默认生成 `mode: "quantize"` 和 `colors: 256`；如需原有严格无损压缩，改为 `mode: "lossless"`。
 
 `init` 实际生成的字体配置是：
 
@@ -242,7 +243,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 | 完整压缩 | `mikit build --min` | 执行基本构建，并对 HTML、CSS、JS 进行压缩 |
 | 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅压缩 CSS |
 | 字体子集化 | `mikit build --minfont` | 构建后按字体族提取字符并裁剪本地 TTF |
-| 无损 PNG 压缩 | `mikit build --png` | 构建后递归压缩输出目录中的 PNG，保持像素一致 |
+| PNG 压缩 | `mikit build --png` | 构建后递归压缩输出目录中的 PNG；默认量化到最多 256 色，可配置为严格无损 |
 
 **构建选项：**
 
@@ -252,9 +253,9 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--mincss`：仅压缩 CSS。
 - `--minjs`：仅压缩 JavaScript。
 - `--autoprefixer`：为 CSS 添加浏览器前缀。
-- `--png`：构建后对本次实际输出目录执行严格无损 PNG 压缩。
+- `--png`：构建后对本次实际输出目录执行 PNG 压缩；默认使用 Imagine/pngquant 风格的 256 色量化，具体模式读取 `mikit.png`。
 - `--minfont`：构建后开启字体子集化；如果 `mikit.font.pages` 非空，会在同一次处理中自动访问动态 URL。
-- `--font-page <page>`：指定相对构建输出目录的静态 HTML 页面或 glob（默认：`font.html`），例如 `pages/*.html`、`**/*.html`。它不用于填写动态 URL。
+- `--font-page <page>`：覆盖默认的 SHTML 自动扫描，指定相对构建输出目录的静态 HTML 页面或 glob，例如 `pages/*.html`、`**/*.html`。不传时会递归扫描 `wwwroot` 中所有非 `_` 开头的 `.shtml` 对应构建页面；它不用于填写动态 URL。
 - `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\site\font`，与 `wwwroot`、`dist` 同级；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
 
 ### 3. 字体子集化
@@ -275,7 +276,7 @@ mikit font
 mikit font --output custom-dist
 ```
 
-自定义静态页面和字符清单目录：
+覆盖自动扫描页面，并自定义字符清单目录：
 
 ```bash
 mikit font --font-page "**/*.html" --font-manifest "font-manifests"
@@ -295,8 +296,10 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 
 #### 静态 HTML 提取规则
 
-- 默认优先匹配输出目录中的 `font.html`；`--font-page` 没有匹配结果时，回退扫描输出目录根层的 `*.html`。
-- `--font-page` 支持明确文件和 glob，例如 `index.html`、`pages/*.html`、`**/*.html`。匹配结果和动态 URL 映射出的本地 HTML 会去重后共同扫描。
+- 默认递归发现 `wwwroot/**/*.shtml`，排除任意目录下文件名以 `_` 开头的页面，再扫描它们在构建输出中的同路径 `.html`。例如 `wwwroot/index.shtml` 映射为 `dist/index.html`，`wwwroot/pages/list.shtml` 映射为 `dist/pages/list.html`；`wwwroot/include/_pop.shtml` 不会作为独立页面扫描。
+- 不再要求专门维护 `font.shtml`。所有符合上述规则的 SHTML 页面都会纳入扫描；页面文字只有匹配到目标字体的 CSS `font-family`（包括继承）时，才会写入该字体的字符清单。
+- 如果项目没有可发现的源 SHTML（例如只有构建输出），会递归扫描输出目录中的 `**/*.html`，并排除文件名以 `_` 开头的 HTML。
+- `--font-page` 支持明确文件和 glob，例如 `index.html`、`pages/*.html`、`**/*.html`；传入后用于覆盖默认 SHTML 自动发现。指定模式没有匹配结果时，仍按兼容规则回退扫描输出目录根层的 `*.html`。匹配结果和动态 URL 映射出的本地 HTML 会去重后共同扫描。
 - 静态 CSS 匹配是轻量实现，不是完整浏览器 CSS 引擎。当前支持标签、ID、class、后代选择器、子选择器、字体继承、规则顺序、选择器优先级、`!important` 和内联 `font-family`；不应依赖复杂属性选择器或兄弟选择器进行字体识别。
 - HTML 中明确写出的字面文本都会参与扫描，包括 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中的各状态文字。
 - Vue 的 `{{ ... }}` 插值表达式会整体忽略，避免把变量名和语法符号误当成页面字符。例如：
@@ -387,7 +390,7 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 - 可选压缩 HTML、CSS、JavaScript。
 - 可选通过 autoprefixer 添加 CSS 前缀。
 - SCSS 中 `_` 前缀文件作为 partial，不单独输出；`include` 目录中 `_` 前缀文件不会直接复制到构建目录。
-- 可在构建完成后继续执行字体子集化和严格无损 PNG 压缩。
+- 可在构建完成后继续执行字体子集化和 PNG 压缩；PNG 默认量化到最多 256 色，也可切换为严格无损。
 
 ### 5. 子域名匹配机制
 - 支持通过子域名访问不同项目
@@ -514,6 +517,8 @@ npm run sync:svn
     },
     "png": {
       "root": "dist",
+      "mode": "quantize",
+      "colors": 256,
       "level": "balanced",
       "exclude": []
     },
@@ -550,13 +555,15 @@ npm run sync:svn
 
 ### `mikit png`
 
-递归扫描 `mikit.png.root` 下扩展名为 `.png` 的文件（扩展名大小写不敏感），使用严格无损方式重新编码，并且只有输出确实更小时才覆盖原文件。压缩不会调用颜色量化接口，不减少实际颜色数量，也不会改变解码后的像素；允许在像素完全等价时优化位深、颜色类型、调色板和 PNG 行过滤方式。非关键 PNG 元数据不会被主动整体剥离。
+递归扫描 `mikit.png.root` 下扩展名为 `.png` 的文件（扩展名大小写不敏感），并且只有输出确实更小时才覆盖原文件。默认使用与 Imagine 相同的 pngquant 调用方式，把图片量化到最多 256 色；这是有损压缩，通常能比严格无损明显缩小体积，但不保证逐像素一致，也不保证完整保留 PNG 非关键元数据。
 
-配置示例：
+默认配置：
 
 ```json
 "png": {
   "root": "dist",
+  "mode": "quantize",
+  "colors": 256,
   "level": "balanced",
   "exclude": [
     "img/no-compress.png",
@@ -568,10 +575,25 @@ npm run sync:svn
 
 - `root`：独立执行 `mikit png` 时的扫描目录，默认是 `dist`。
 - `exclude`：相对 `root` 的 glob 数组，可排除单张图片、目录或文件名模式；建议统一使用 `/`。
-- `level`：只控制压缩时尝试的无损算法范围和耗时，不是画质参数：
+- `mode`：压缩模式；省略时默认是 `quantize`。
+  - `quantize`：默认模式，使用 pngquant 颜色量化，效果对应 Imagine 的 PNG“色彩”设置，属于有损压缩。
+  - `lossless`：完整保留原有严格无损模式，解码后的像素保持一致，并保留原有非主动剥离元数据的行为。
+- `colors`：仅用于 `quantize`，必须是 `2` 到 `256` 的整数，默认 `256`。数值越低通常压缩越强，但颜色损失、渐变色带和透明边缘变化也可能更明显。
+- `level`：仅用于 `lossless`，控制尝试的无损算法范围和耗时，不是画质参数：
   - `fast`：尝试较少的过滤方案，速度最快，文件通常稍大。
-  - `balanced`：默认等级，在耗时与体积之间取平衡。
+  - `balanced`：默认无损等级，在耗时与体积之间取平衡。
   - `max`：尝试全部受支持的过滤方案，耗时最高，但不保证每张图都比 `balanced` 更小。
+
+切换为原有严格无损模式：
+
+```json
+"png": {
+  "root": "dist",
+  "mode": "lossless",
+  "level": "max",
+  "exclude": []
+}
+```
 
 独立压缩已有构建目录：
 
@@ -585,9 +607,9 @@ mikit png
 mikit build --output custom-dist --png
 ```
 
-`build --png` 会使用本次构建的实际输出目录（例如上面的 `custom-dist`），而不是 `mikit.png.root`；`level` 和 `exclude` 仍读取 `mikit.png`。如果缺少配置、目录不存在或某张 PNG 无法解析，命令会输出包含相对图片路径的错误并以非零状态退出。
+`build --png` 会使用本次构建的实际输出目录（例如上面的 `custom-dist`），而不是 `mikit.png.root`；`mode`、`colors`、`level` 和 `exclude` 仍读取 `mikit.png`。如果缺少配置、目录不存在或某张 PNG 无法解析，命令会输出包含相对图片路径的错误并以非零状态退出。
 
-与 TinyPNG 的区别：TinyPNG 通常通过颜色量化等有损方式换取更小体积，因此很多图片会比这里的严格无损结果更小。本功能不采用这种方式，三个等级都保持解码后像素完全一致；等级越高只代表尝试更多无损压缩方案，不代表降低画质。
+与 Imagine / TinyPNG 的关系：默认 `quantize` 直接使用 Imagine 同类的 pngquant 颜色量化思路，体积通常会比原有严格无损模式小很多，效果也更接近 TinyPNG 一类有损压缩服务，但具体输出和压缩率不保证完全相同。需要逐像素一致时应显式使用 `mode: "lossless"`；此时 `fast`、`balanced`、`max` 只影响无损算法尝试范围，不会降低画质。
 
 ### `mikit sync-svn`
 
