@@ -16,7 +16,7 @@ const {
 
 function createOutputFixture(t, { files = [], directories = [] } = {}) {
   const fixtureRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), "mikit-font-subsetter-"),
+    path.join(os.tmpdir(), "mikit-font-fixture-"),
   );
   const outputDir = path.join(fixtureRoot, "dist");
   fs.mkdirSync(outputDir);
@@ -489,6 +489,111 @@ test("removes remote-only font files without creating a backup directory", (t) =
 });
 
 
+
+test('removes unreferenced fonts when no local font can be subset', (t) => {
+  const outputDir = createOutputFixture(t, {
+    files: [
+      'css/site.css',
+      'font/unused.ttf',
+      'font/unused.woff',
+      'font/unused.woff2',
+    ],
+    directories: ['css', 'font'],
+  });
+  const projectDir = path.dirname(outputDir);
+  const fontDir = path.join(outputDir, 'font');
+  const cssDir = path.join(outputDir, 'css');
+
+  fs.mkdirSync(fontDir);
+  fs.mkdirSync(cssDir);
+  fs.writeFileSync(path.join(cssDir, 'site.css'), '.page{font-family:sans-serif}');
+  ['unused.ttf', 'unused.woff', 'unused.woff2'].forEach((fileName) => {
+    fs.writeFileSync(path.join(fontDir, fileName), 'source font');
+  });
+
+  const result = subsetFonts({
+    projectDir,
+    outputDir: 'dist',
+    manifestDir: path.join(outputDir, 'manifests'),
+  });
+
+  assert.deepEqual(result.processed, []);
+  ['unused.ttf', 'unused.woff', 'unused.woff2'].forEach((fileName) => {
+    assert.equal(fs.existsSync(path.join(fontDir, fileName)), false);
+  });
+});
+
+test('removes every font except referenced fonts with extracted characters', (t) => {
+  const outputDir = createOutputFixture(t, {
+    files: [
+      'font.html',
+      'css/site.css',
+      'font/used.ttf',
+      'font/used.woff',
+      'font/used.woff2',
+      'font/used.eot',
+      'font/unused.ttf',
+      'font/unused.woff',
+      'font/unused.woff2',
+      'font/unused.svg',
+      'manifests/used.txt',
+    ],
+    directories: ['manifests', 'css', 'font'],
+  });
+  const projectDir = path.dirname(outputDir);
+  const fontDir = path.join(outputDir, 'font');
+  const cssDir = path.join(outputDir, 'css');
+  const manifestDir = path.join(outputDir, 'manifests');
+  const usedFontPath = path.join(fontDir, 'used.ttf');
+
+  fs.mkdirSync(fontDir);
+  fs.mkdirSync(cssDir);
+  fs.writeFileSync(
+    path.join(outputDir, 'font.html'),
+    '<div class="used">保留文字</div>',
+  );
+  fs.writeFileSync(
+    path.join(cssDir, 'site.css'),
+    [
+      '@font-face{font-family:"Used";src:url(../font/used.eot),url(../font/used.ttf)}',
+      '.used{font-family:"Used"}',
+    ].join(''),
+  );
+  [
+    'used.ttf',
+    'used.eot',
+    'unused.ttf',
+    'unused.woff',
+    'unused.woff2',
+    'unused.svg',
+  ].forEach((fileName) => {
+    fs.writeFileSync(path.join(fontDir, fileName), 'source font');
+  });
+
+  const result = subsetFonts({
+    projectDir,
+    outputDir: 'dist',
+    manifestDir,
+    commandRunner(command, args) {
+      const outputArgument = args.find((argument) =>
+        argument.startsWith('--output-file='),
+      );
+      fs.writeFileSync(outputArgument.slice('--output-file='.length), 'subset');
+      return { status: 0 };
+    },
+  });
+
+  assert.deepEqual(result.processed, [usedFontPath]);
+  assert.deepEqual(result.skipped, []);
+  ['used.ttf', 'used.woff', 'used.woff2'].forEach((fileName) => {
+    assert.equal(fs.existsSync(path.join(fontDir, fileName)), true);
+  });
+  ['used.eot', 'unused.ttf', 'unused.woff', 'unused.woff2', 'unused.svg'].forEach(
+    (fileName) => {
+      assert.equal(fs.existsSync(path.join(fontDir, fileName)), false);
+    },
+  );
+});
 
 test("ignores formatting-only whitespace when collecting font characters", () => {
   const characters = collectFontCharacters({

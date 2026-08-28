@@ -84,7 +84,7 @@ Dynamic collection is separate and supplements static results. Configure rendere
 - `timeout`: positive page/selector timeout in milliseconds.
 - `browserExecutable`: optional browser executable path; omit it to use supported local Chrome/Edge discovery.
 
-Font operations require `fonttools` and Brotli so `pyftsubset` can generate TTF, WOFF, and WOFF2. Dynamic URL collection additionally requires a reachable local page and Chrome or Edge.
+Font operations require `fonttools` and Brotli so `pyftsubset` can generate TTF, WOFF, and WOFF2. After collection, Mikit keeps only fonts that are locally referenced by CSS and have at least one extracted character; each retained font keeps TTF, WOFF, and WOFF2, while unreferenced fonts, zero-character fonts, and other font formats are removed from the build output. Dynamic URL collection additionally requires a reachable local page and Chrome or Edge.
 
 ## PNG Optimization
 

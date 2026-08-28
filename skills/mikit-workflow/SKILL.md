@@ -58,7 +58,7 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 ## Respect Mutation Boundaries
 
 - Building may replace the configured build output. Packing resets its configured output directory after input preflight. Run these commands only when the user requested the corresponding generated artifact.
-- `mikit replace`, `mikit png`, and `mikit font` modify configured generated files in place. Confirm that the configured root is the intended output before running them.
+- `mikit replace`, `mikit png`, and `mikit font` modify configured generated files in place. Confirm that the configured root is the intended output before running them. `mikit font` removes fonts that are not locally referenced by CSS or produce zero extracted characters, and leaves only TTF, WOFF, and WOFF2 for retained fonts.
 - `mikit sync-svn` performs the configured copy directly. It must not run `svn add`, `svn delete`, `svn commit`, create missing SVN directories, or delete content.
 - Do not manually edit generated output to imitate a successful command. Fix source or configuration and rerun the CLI.
 
@@ -70,7 +70,7 @@ After a mutating command:
 2. Confirm expected output directories or files exist.
 3. For configuration edits, parse `package.json` and inspect the focused diff.
 4. For builds, packing, PNG, replacement, or font operations, inspect representative artifacts relevant to the request.
-5. For font subsetting, verify the expected TTF, WOFF, and WOFF2 outputs when fonts were processed.
+5. For font subsetting, verify that only CSS-referenced fonts with non-zero extracted characters remain, with TTF, WOFF, and WOFF2 outputs for each retained font.
 6. For SVN synchronization, report target count and copied/skipped counts; do not claim an SVN commit occurred.
 7. Run proportionate syntax, project tests, or `git diff --check` when repository files were changed.
 
