@@ -21,6 +21,32 @@ Use Mikit-CLI as the execution layer. This skill interprets the request, inspect
 - Read [configuration.md](references/configuration.md) only for the commands or configuration sections needed by the current task.
 - Read [troubleshooting.md](references/troubleshooting.md) only after an environment, dependency, path, browser, or command failure.
 
+## Guide AI-Assisted Installation
+
+When the user asks an AI agent to install Mikit-CLI, install or update this Skill, or add Mikit to a consumer project, treat alias configuration as an onboarding step whenever development-server routing or global build attribution may be used. Installation is not complete just because `mikit --help` works.
+
+- After CLI or Skill verification, inspect `MIKIT_ALIAS_CONFIG` and the nearest `mikit.alias.json` from the intended project root or workspace root.
+- If an alias file exists, report its path and whether `domain`, `port`, `auto`, `projects`, and `author` are configured. Do not rewrite it unless the user asked to change it.
+- If no usable alias file exists, guide the user to create a workspace-level `mikit.alias.json` such as `F:/NDW/mikit.alias.json` when several projects share one parent. Ask for the unified root, domain, port, global author, whether to enable `auto`, and any required manual `projects` aliases.
+- Prefer nearest-parent discovery for projects under a common workspace. Offer `MIKIT_ALIAS_CONFIG` only as an optional persistent fallback for new terminal processes, and ask before setting or changing a Windows user environment variable.
+- For same-port subdomain previews, remind the user that the visible port is shared and subdomains select projects, for example `http://project.y.bindyy.cn:8080/` and `http://project.y.bindyy.cn:8080/dist/`.
+
+## Handle Initialization and Broad Configuration Requests
+
+When the user asks to initialize Mikit, add Mikit to an existing project, or configure several capabilities together, do not limit discovery to the features named in the first sentence. Inspect the project first, then give the user a concise capability checklist and batch only the unresolved decisions. Explain detected values and safe defaults so the user can accept them instead of having to invent every field.
+
+Treat font subsetting, packing, and SVN synchronization as three independent optional decisions. Ask each one as a separate numbered question or separate input field and label each as optional. They may appear in the same message, but do not combine them into one “other optional features” question and do not silently default any of them to disabled. Ask a feature's detailed follow-up values only after the user chooses to enable it.
+
+- **Build:** confirm the source and output directories, then offer no minification, CSS-only minification (`--mincss`), or full HTML/CSS/JavaScript minification (`--min`). Also ask about Autoprefixer when the project may need browser prefixes. Mention that local-font subsetting is available, but collect the user's decision only in the separate optional font-subsetting question.
+- **Font subsetting (optional):** separately ask whether to enable local-font subsetting through `--minfont` or `mikit font`. Mention the Python prerequisites before the user decides. If enabled, distinguish automatic static collection from optional dynamic-page collection. Static collection normally needs no page configuration. Ask for `mikit.font.pages`, readiness selector, wait, timeout, or browser path only when rendered dynamic text must be included.
+- **PNG:** recommend the current default `mode: "quantize"` with `colors: 256`, clearly labeling it as 256-color lossy quantization. Ask whether to keep that recommended default or switch to strict `lossless`; ask for `fast`, `balanced`, or `max` only for lossless mode. Confirm the effective root. Separately ask whether to keep the optional exclusion list empty or configure `exclude` patterns; do not silently choose “none.” If project inspection already found `img/txt` or `img/origin` under the effective PNG root, or found the same relative directories in source content that will map into the output root, recommend the detected directories as candidate exclusions such as `img/txt/**` or `img/origin/**`. Ask the user to confirm the recommendation instead of adding it automatically.
+- **CSS replacement:** inspect likely built CSS paths, but do not invent the literal `from` value or destination URLs. Ask whether development and production use different addresses. When they do, configure a `to` environment map with `development` and `production`, matching the generated `replace:dev` and `replace:build` scripts; otherwise a single string is sufficient.
+- **Packing (optional):** separately ask whether the project needs SHTML-to-Go-template packing. If yes, confirm `source`, `dist`, `output`, `pageDirs`, `assetDirs`, and page exclusions before enabling or running it.
+- **SVN synchronization (optional):** separately ask whether built CSS must be copied to SVN working copies. If yes, obtain the source CSS directory, one or more existing target directories, and direct CSS file patterns. Make clear that this does not add, commit, or publish SVN changes.
+- **Development server and attribution:** when relevant, confirm the port/root/domain and any alias or virtual mappings. Inspect the project and global author settings; ask for the project author and employee number only when attribution is required and no usable value exists.
+
+Do not force the user to configure every optional capability. Record declined features as out of scope, preserve already-valid project settings, and ask follow-up questions only for enabled features whose required values remain unknown. Before writing changes, summarize the resulting scripts and `mikit` sections that will be added or changed.
+
 ## Choose the CLI Invocation
 
 Prefer the invocation already established by the project:
@@ -49,6 +75,9 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 
 - `mikit init` refuses to overwrite an existing `package.json`. If one already exists, inspect it and merge only the required scripts and `mikit` sections.
 - Keep paths relative to the consumer project when practical. In JSON on Windows, prefer `/` or escaped `\\` separators.
+- Before a build, inspect `package.json > mikit.author` and the optional global `mikit.alias.json > author`. Do not invent either value. When the project author is empty, the global author becomes `Author`; only when both are empty will CSS/JS author headers be skipped.
+- The global author comes from `mikit.alias.json > author`. Resolve the alias file in this order: explicit `--alias` where supported, `MIKIT_ALIAS_CONFIG`, then the nearest `mikit.alias.json` found by walking upward from the current root. With a project author it becomes `Editor`; without a project author it becomes `Author`. A missing path, unreadable file, invalid JSON, or empty global author does not block a build that still has a project author.
+- Treat `mikit.png.mode: "quantize"` with `colors: 256` as the recommended default, not as lossless compression. Use `mode: "lossless"` only when the user requires pixel-identical output.
 - For font subsetting, keep the default static discovery unless the user explicitly needs a narrower page set: Mikit scans `wwwroot/**/*.shtml`, excludes files whose basename starts with `_`, and maps each source page to the same-path `.html` in the build output. Use `--font-page` only to override this static discovery; do not require a dedicated `font.shtml`.
 - Do not enable optional font browser scanning unless the user needs dynamic-page text collection.
 - Preserve legacy `mikit.syncSvn.target` when it is already valid. Use `targets` for multiple destinations, and never configure both fields.
@@ -69,7 +98,7 @@ After a mutating command:
 1. Check the command exit status and retain the command-prefixed error if it fails.
 2. Confirm expected output directories or files exist.
 3. For configuration edits, parse `package.json` and inspect the focused diff.
-4. For builds, packing, PNG, replacement, or font operations, inspect representative artifacts relevant to the request.
+4. For builds, packing, PNG, replacement, or font operations, inspect representative artifacts relevant to the request. When either the project or global author is configured, verify representative CSS and JavaScript headers and confirm Sass-generated CSS uses the same compile timestamp.
 5. For font subsetting, verify that only CSS-referenced fonts with non-zero extracted characters remain, with TTF, WOFF, and WOFF2 outputs for each retained font.
 6. For SVN synchronization, report target count and copied/skipped counts; do not claim an SVN commit occurred.
 7. Run proportionate syntax, project tests, or `git diff --check` when repository files were changed.

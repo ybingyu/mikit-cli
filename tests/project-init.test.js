@@ -40,7 +40,7 @@ function testCreatesPackageJsonInCurrentDirectory() {
       'mbuild:font': 'mikit build --mincss --minfont',
       png: 'mikit png',
       replace: 'mikit replace',
-      'replace:dev': 'set NODE_ENV=pp &&  npm run replace',
+      'replace:dev': 'set NODE_ENV=development &&  npm run replace',
       'replace:build': 'set NODE_ENV=production &&  npm run replace',
       dev: 'npm run mbuild  && npm run replace:dev',
       build: 'npm run mbuild  && npm run replace:build',
@@ -50,6 +50,7 @@ function testCreatesPackageJsonInCurrentDirectory() {
       'build:svn': 'npm run build && npm run sync:svn'
     });
     assert.deepEqual(packageJson.mikit, {
+      author: '',
       replace: {
         root: 'dist',
         include: ['**/*.css'],

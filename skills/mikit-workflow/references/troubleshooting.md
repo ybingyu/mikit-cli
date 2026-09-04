@@ -46,6 +46,8 @@ Use literal-path-aware PowerShell commands when inspecting paths containing Chin
 
 ## Build or Output Problems
 
+- If `MIKIT_ALIAS_CONFIG` was just saved as a Windows user environment variable, an already-running IDE may not expose it through `process.env`. Mikit can still use the nearest `mikit.alias.json` found by walking upward from the current project/root; explicit `--alias` remains available for `start` and `serve`.
+- If build output has no author header, check both `package.json > mikit.author` and the global `mikit.alias.json > author`. A valid global author becomes `Author` when the project author is empty; headers are skipped only when both values are unavailable.
 - Confirm the command is running from the intended project root.
 - Confirm `wwwroot` exists for a build.
 - Confirm configured `dist`, `output`, or operation root points to generated content.

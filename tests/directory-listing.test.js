@@ -85,8 +85,11 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
 });
 `);
 
+  const childEnv = { ...process.env };
+  delete childEnv.MIKIT_ALIAS_CONFIG;
   const child = spawn(process.execPath, [serverScript], {
     cwd: repoRoot,
+    env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe']
   });
 

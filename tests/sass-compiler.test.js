@@ -94,8 +94,11 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
   virtual: {}
 });
 `);
+    const childEnv = { ...process.env };
+    delete childEnv.MIKIT_ALIAS_CONFIG;
     child = spawn(process.execPath, [serverScript], {
       cwd: repoRoot,
+      env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe']
     });
     const getServerOutput = await waitForServer(child, port);

@@ -71,11 +71,12 @@ Copy-Item -LiteralPath ".\skills\mikit-workflow" -Destination $skillDest -Recurs
 安装后在下一轮 Codex 对话中可以直接描述需求，例如：
 
 - “帮我给当前项目接入 Mikit。”
+- “帮我检查并配置 `F:\NDW\mikit.alias.json`，让项目可以用同一个端口按子域名访问。”
 - “构建并压缩 CSS 和 PNG。”
 - “检查配置后把 CSS 同步到 SVN。”
 - “使用 `$mikit-workflow` 处理当前项目的字体子集化。”
 
-Skill 会先检查项目和配置，缺少必要路径、地址或运行环境时会询问，不会自行猜测。仓库同步到 GitHub 后，也可以通过 Codex 的 GitHub Skill 安装方式直接安装 `skills/mikit-workflow` 子目录。
+Skill 会先检查项目和配置，缺少必要路径、地址或运行环境时会询问，不会自行猜测。安装或接入项目时，如果后续会用同端口子域名服务或全局作者注释，AI 应继续引导配置 `mikit.alias.json`：先查找已有配置和 `MIKIT_ALIAS_CONFIG`，再询问统一根目录、域名、端口、全局作者、是否启用 `auto` 自动扫描，以及是否需要手动 `projects` 映射。Windows 用户环境变量只是可选持久入口，设置前应先确认；项目位于 alias 文件下级目录时，优先使用向上自动发现即可。仓库同步到 GitHub 后，也可以通过 Codex 的 GitHub Skill 安装方式直接安装 `skills/mikit-workflow` 子目录。
 
 ## 基本命令
 
@@ -105,7 +106,8 @@ mikit init
 命令只会在当前目录生成 `package.json`，不会创建项目目录、页面、CSS 或 JavaScript 模板。生成的配置包含：
 
 - 固定生成构建、PNG 压缩、替换、打包和 SVN 同步所需的 12 个 npm scripts。
-- `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png`、`mikit.font` 基础配置。
+- `mikit.author` 作者配置，以及 `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png`、`mikit.font` 基础配置。
+- `mikit.author` 默认是空字符串；填写后作为项目原作者。未填写时，`mikit build` 会尝试使用全局 alias 配置中的 `author` 作为作者。
 - CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
 - `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
@@ -177,6 +179,7 @@ http://project-c.y.bindyy.cn:8080
 
 ```json
 {
+  "author": "全局作者(工号)",
   "domain": "y.bindyy.cn",
   "port": 8080,
   "default": "wjms",
@@ -211,6 +214,14 @@ lxzh.y.bindyy.cn
 ```bash
 mikit start --port 8080 --root "F:\NDW" --alias "F:\NDW\mikit.alias.json"
 ```
+
+当项目位于 `mikit.alias.json` 所在目录或其子目录时，`mikit start`、`mikit serve` 和 `mikit build` 会从当前根目录向上自动查找最近的 `mikit.alias.json`。因此像 `F:\NDW\【魔域】\网吧\wb` 这样的项目可以直接读取 `F:\NDW\mikit.alias.json`，不依赖 IDE 是否继承了环境变量。也可以把 alias 配置路径保存为当前 Windows 用户环境变量：
+
+```powershell
+[Environment]::SetEnvironmentVariable('MIKIT_ALIAS_CONFIG', 'F:\NDW\mikit.alias.json', 'User')
+```
+
+读取优先级为：显式 `--alias`、`MIKIT_ALIAS_CONFIG`、从当前根目录向上自动发现的最近 `mikit.alias.json`。用户环境变量不会自动进入已经打开的终端，但自动发现不依赖环境变量。
 
 启动后使用同一个端口访问：
 
@@ -257,6 +268,32 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--minfont`：构建后开启字体子集化；如果 `mikit.font.pages` 非空，会在同一次处理中自动访问动态 URL。
 - `--font-page <page>`：覆盖默认的 SHTML 自动扫描，指定相对构建输出目录的静态 HTML 页面或 glob，例如 `pages/*.html`、`**/*.html`。不传时会递归扫描 `wwwroot` 中所有非 `_` 开头的 `.shtml` 对应构建页面；它不用于填写动态 URL。
 - `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\site\font`，与 `wwwroot`、`dist` 同级；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
+
+#### 构建作者注释
+
+在项目 `package.json` 中配置原始作者：
+
+```json
+{
+  "mikit": {
+    "author": "项目作者(工号)"
+  }
+}
+```
+
+`mikit build` 或项目中的 `mbuild` 会在普通 CSS、JavaScript 和 Sass 编译生成的 CSS 头部加入作者注释。注释在压缩、Autoprefixer 和 Sass 编译完成后添加，同一次构建的全部文件使用相同的编译时间。
+
+当项目 `mikit.author` 和全局 alias `author` 都存在时，项目作者写入 `Author`，全局作者写入 `Editor`。全局 alias 优先读取 `MIKIT_ALIAS_CONFIG`，未设置时从项目目录向上查找最近的 `mikit.alias.json`：
+
+```css
+/*
+ * Author: 项目作者(工号)
+ * Editor: 全局作者(工号)
+ * Compile Date: YYYY-MM-DD HH:mm
+ */
+```
+
+当项目 `mikit.author` 缺失或为空，但全局 `author` 存在时，全局作者写入 `Author`，并省略 `Editor`。当项目作者存在但全局配置未设置、文件不存在、JSON 格式错误或全局 `author` 为空时，只写项目 `Author`，并省略 `Editor`。只有项目作者和全局作者都不可用时，才不添加作者注释，并且每次构建只提醒一次。该功能只属于 `mikit build`，不会在 `mikit pack` 阶段重复添加。
 
 ### 3. 字体子集化
 
@@ -450,7 +487,7 @@ npm run sync:svn
     "mbuild:font": "mikit build --mincss --minfont",
     "png": "mikit png",
     "replace": "mikit replace",
-    "replace:dev": "set NODE_ENV=pp &&  npm run replace",
+    "replace:dev": "set NODE_ENV=development &&  npm run replace",
     "replace:build": "set NODE_ENV=production &&  npm run replace",
     "dev": "npm run mbuild  && npm run replace:dev",
     "build": "npm run mbuild  && npm run replace:build",
@@ -460,6 +497,7 @@ npm run sync:svn
     "build:svn": "npm run build && npm run sync:svn"
   },
   "mikit": {
+    "author": "项目作者(工号)",
     "replace": {
       "root": "dist",
       "include": ["**/*.css"],
@@ -480,14 +518,14 @@ npm run sync:svn
         {
           "from": "../../font/",
           "to": {
-            "default": "https://wjdown.99.com/games/my/2026/hks/font/",
+            "development": "https://wjdown.99.com/games/my/2026/hks/font/",
             "production": "https://myvideo.99.com/games/my/2026/hks/font/"
           }
         },
         {
           "from": "../font/",
           "to": {
-            "default": "https://wjdown.99.com/games/my/2026/hks/font/",
+            "development": "https://wjdown.99.com/games/my/2026/hks/font/",
             "production": "https://myvideo.99.com/games/my/2026/hks/font/"
           }
         },
@@ -662,6 +700,9 @@ project/
     "build": "mikit build",
     "build:minify": "mikit build --min",
     "build:minify-css": "mikit build --mincss"
+  },
+  "mikit": {
+    "author": "项目作者(工号)"
   },
   "devDependencies": {
     "mikit-cli": "file:../mikit-cli"
