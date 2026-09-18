@@ -11,6 +11,8 @@ const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-directory-listi
 const wwwroot = path.join(fixtureRoot, 'wwwroot');
 const dist = path.join(fixtureRoot, 'dist');
 const port = 19080 + (process.pid % 1000);
+const chineseHtmlName = 'HEL精英联赛冬季赛-前往观赛展示.html';
+const distChineseHtmlName = '构建产物展示.html';
 
 function request(pathname) {
   return new Promise((resolve, reject) => {
@@ -70,11 +72,13 @@ function stopServer(child) {
 (async () => {
   fs.mkdirSync(wwwroot);
   fs.writeFileSync(path.join(wwwroot, 'alpha.shtml'), 'alpha');
+  fs.writeFileSync(path.join(wwwroot, chineseHtmlName), '中文页面');
   fs.writeFileSync(path.join(wwwroot, 'plain.txt'), 'plain');
   fs.mkdirSync(path.join(wwwroot, 'nested'));
   fs.writeFileSync(path.join(wwwroot, 'nested', 'beta.html'), 'beta');
   fs.mkdirSync(dist);
   fs.writeFileSync(path.join(dist, 'bundle.js'), 'bundle');
+  fs.writeFileSync(path.join(dist, distChineseHtmlName), '中文构建页面');
 
   fs.writeFileSync(serverScript, `
 process.chdir(${JSON.stringify(fixtureRoot)});
@@ -111,15 +115,25 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
     assert.strictEqual(nestedNoSlashResponse.statusCode, 200);
     assert.match(nestedNoSlashResponse.body, /href="\/nested\/beta\.html"/);
 
+    const chineseHtmlResponse = await request(`/${encodeURIComponent(chineseHtmlName)}`);
+    assert.strictEqual(chineseHtmlResponse.statusCode, 200);
+    assert.match(chineseHtmlResponse.body, /中文页面/);
+
     const distResponse = await request('/dist/');
     assert.strictEqual(distResponse.statusCode, 200);
     assert.match(distResponse.body, /bundle\.js/);
+
+    const distChineseHtmlResponse = await request(`/dist/${encodeURIComponent(distChineseHtmlName)}`);
+    assert.strictEqual(distChineseHtmlResponse.statusCode, 200);
+    assert.match(distChineseHtmlResponse.body, /中文构建页面/);
   } finally {
     await stopServer(child);
     fs.unlinkSync(serverScript);
     fs.unlinkSync(path.join(dist, 'bundle.js'));
+    fs.unlinkSync(path.join(dist, distChineseHtmlName));
     fs.rmdirSync(dist);
     fs.unlinkSync(path.join(wwwroot, 'alpha.shtml'));
+    fs.unlinkSync(path.join(wwwroot, chineseHtmlName));
     fs.unlinkSync(path.join(wwwroot, 'plain.txt'));
     fs.unlinkSync(path.join(wwwroot, 'nested', 'beta.html'));
     fs.rmdirSync(path.join(wwwroot, 'nested'));
