@@ -16,7 +16,7 @@ npm run <project-script>
 
 For a broad initialization request, inspect the project and resolve these choices before writing configuration:
 
-- Build output and minification: none, CSS only, or HTML/CSS/JavaScript; separately ask about Autoprefixer.
+- Build output and minification: none, CSS only, or HTML/CSS/JavaScript; separately ask about Autoprefixer. When Autoprefixer is enabled, preserve an existing `package.json > browserslist` or `.browserslistrc`; if neither exists, ask the user for the required browser range and confirm the proposed Browserslist entries before writing them.
 - Font subsetting (optional): ask as its own decision whether to enable `--minfont` or `mikit font`. If enabled, use automatic static discovery by default; request dynamic page URLs and timing/browser settings only when the user needs rendered dynamic text.
 - PNG: keep the recommended 256-color quantization or switch to strict lossless; confirm the root, then explicitly ask whether to keep no exclusions or configure optional `exclude` patterns. If inspection found `img/txt` or `img/origin` in the effective PNG root or at the same relative path in source content that will be copied to the output root, recommend those detected directories as exclusions and wait for confirmation.
 - CSS replacement: obtain the literal source string and either one shared destination or separate `development` and `production` destinations.
@@ -67,7 +67,25 @@ Important flags:
 - `--min`: minify HTML, CSS, and JavaScript.
 - `--minhtml`, `--mincss`, `--minjs`: selective minification.
 - `--png`: run the configured PNG optimization during build. The default is 256-color quantization; it is lossless only when `mikit.png.mode` is explicitly `lossless`.
-- `--autoprefixer`: add CSS prefixes.
+- `--autoprefixer`: add CSS prefixes according to the project's Browserslist configuration.
+
+When the user enables Autoprefixer during initialization:
+
+1. Check `package.json > browserslist` and `.browserslistrc` first. Preserve an existing valid configuration and tell the user which one will be used.
+2. If no configuration exists, ask which browser range must be supported. Do not invent legacy-browser requirements.
+3. Offer the following common starting point only as a recommendation that requires confirmation:
+
+```json
+{
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
+```
+
+4. Prefer adding `browserslist` to the existing `package.json` for a new setup. Do not also create `.browserslistrc`, because competing configuration sources make the effective target unclear.
 - `--minfont`: subset local fonts after building. By default, recursively discover `wwwroot/**/*.shtml`, exclude files whose basename starts with `_`, and scan their same-path `.html` build outputs.
 - `--font-page <page>`: override the default static SHTML discovery with an output-relative HTML file or glob. It is not a dynamic URL option.
 
