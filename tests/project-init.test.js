@@ -85,7 +85,12 @@ function testCreatesPackageJsonInCurrentDirectory() {
       font: {
         pages: [],
         wait: 1000,
-        timeout: 15000
+        timeout: 15000,
+        asciiBaseline: 'none',
+        dynamicTextPolicy: 'warn',
+        globalExtraText: '',
+        familyExtraText: {},
+        familyOptions: {}
       }
     });
   } finally {

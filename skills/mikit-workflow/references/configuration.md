@@ -129,7 +129,12 @@ Dynamic collection is separate and supplements static results. Configure rendere
       "waitFor": ".page-ready",
       "wait": 1000,
       "timeout": 15000,
-      "browserExecutable": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+      "browserExecutable": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+      "asciiBaseline": "none",
+      "dynamicTextPolicy": "warn",
+      "globalExtraText": "",
+      "familyExtraText": {},
+      "familyOptions": {}
     }
   }
 }
@@ -140,8 +145,15 @@ Dynamic collection is separate and supplements static results. Configure rendere
 - `wait`: non-negative delay in milliseconds after readiness.
 - `timeout`: positive page/selector timeout in milliseconds.
 - `browserExecutable`: optional browser executable path; omit it to use supported local Chrome/Edge discovery.
+- `asciiBaseline`: `none` by default (only observed/explicit characters); `common` adds common digits and punctuation; `full` adds ASCII 32–126.
+- `globalExtraText`: characters explicitly added to all font families.
+- `familyExtraText`: CSS `font-family` keyed strings for family-specific additions.
+- `familyOptions`: CSS `font-family` keyed objects such as `{ "Title": { "asciiBaseline": "common" } }`.
+- `dynamicTextPolicy`: `warn` by default for unresolved text; `error` stops publication when such risks occur.
 
-Font operations require `fonttools` and Brotli so `pyftsubset` can generate TTF, WOFF, and WOFF2. After collection, Mikit keeps only fonts that are locally referenced by CSS and have at least one extracted character; each retained font keeps TTF, WOFF, and WOFF2, while unreferenced fonts, zero-character fonts, and other font formats are removed from the build output. Dynamic URL collection additionally requires a reachable local page and Chrome or Edge.
+Successful operations print the full path to `font/font-report.json`. In `fonts[]`, `dynamicBinding` flags visible-text dynamic bindings, `missingDigits` lists uncollected digits (possibly empty), and `digitSuggestion` provides advice only if both are present; none of these proves a rendered page is missing a glyph. Use `verification.sourceMissing` for source-font coverage and top-level `risks` for unresolved dynamic copy. Default `asciiBaseline: "none"` does not auto-add digits. Confirm runtime states before adding explicit `pages`, per-family `familyExtraText`, or opting in to `familyOptions.<family>.asciiBaseline: "common"`; rerun and check the report and pages. Font generation and manifest publication are staged and rolled back together on failure.
+
+Font operations require `fonttools`; Brotli is needed when CSS references WOFF2. Mikit recursively scans built `**/*.css` under the output directory (including `scss/`) and built HTML `<style>` blocks, not source SCSS. After collection, it keeps only fonts locally referenced by CSS with at least one extracted character, and only the TTF, WOFF, or WOFF2 formats referenced for each font. A WOFF-only declaration requires an original WOFF file; missing usable input is reported with its path before fonts are removed. Unreferenced and zero-character fonts are removed. Dynamic URL collection additionally requires a reachable local page and Chrome or Edge.
 
 ## PNG Optimization
 

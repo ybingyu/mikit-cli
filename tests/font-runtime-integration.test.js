@@ -36,6 +36,7 @@ function cleanupFixture(fixture) {
   removeFile(path.join(fixture.backupDir, "display.ttf"));
   removeFile(path.join(fixture.backupDir, "remote.ttf"));
   removeFile(path.join(fixture.manifestDir, "display.txt"));
+  removeFile(path.join(fixture.manifestDir, "font-report.json"));
   removeFile(path.join(fixture.cssDir, "app.css"));
   removeFile(path.join(fixture.outputDir, "index.html"));
   removeFile(path.join(fixture.root, "package.json"));
@@ -149,14 +150,14 @@ test("merges static and runtime characters without backing up fonts in dist", (t
     fs.readFileSync(manifestPath, "utf8"),
     "1.9元点击抢购已买30京东E卡溯月至臻圣器匣[绑]",
   );
-  assert.equal(pyftCalls.length, 3);
+  assert.equal(pyftCalls.length, 1);
   assert.equal(
-    pyftCalls.every((args) => args.includes(`--text-file=${manifestPath}`)),
+    pyftCalls.every((args) => args.some((arg) => arg.startsWith('--text-file=') && path.basename(arg.slice(12)) === 'display.txt')),
     true,
   );
   assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.ttf")), true);
-  assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff")), true);
-  assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff2")), true);
+  assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff")), false);
+  assert.equal(fs.existsSync(path.join(fixture.fontDir, "display.woff2")), false);
   assert.equal(fs.existsSync(path.join(fixture.fontDir, "remote.ttf")), false);
   assert.equal(fs.existsSync(fixture.backupDir), false);
   assert.equal(logs.includes("字体静态页面: index.html"), true);
@@ -164,7 +165,7 @@ test("merges static and runtime characters without backing up fonts in dist", (t
   assert.equal(logs.includes("字体运行时页面: /index.shtml?o=2"), true);
   assert.equal(
     logs.some((line) =>
-      /display\.txt（静态 10，运行时新增 16，合计 26）/.test(line),
+      /display\.txt（静态 10，其他新增 16，合计 26）/.test(line),
     ),
     true,
   );
@@ -225,7 +226,7 @@ test("missing runtime pages keeps the existing static-only workflow", (t) => {
   });
 
   assert.equal(runtimeCalls, 0);
-  assert.equal(pyftCalls.length, 3);
+  assert.equal(pyftCalls.length, 1);
   assert.equal(result.processed.length, 1);
   assert.equal(
     fs.readFileSync(path.join(fixture.manifestDir, "display.txt"), "utf8"),

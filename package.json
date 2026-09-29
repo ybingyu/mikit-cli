@@ -7,7 +7,7 @@
   },
   "main": "bin/mikit.js",
   "scripts": {
-    "test": "node tests/font-subsetter.test.js && node tests/font-runtime-config.test.js && node tests/font-runtime-collector.test.js && node tests/font-runtime-runner.test.js && node tests/font-runtime-integration.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/sass-compiler.test.js && node tests/directory-listing.test.js && node tests/svn-css-sync.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/build-author-header.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js && node tests/watcher-safety.test.js"
+    "test": "node tests/font-subsetter.test.js && node tests/font-improvements.test.js && node tests/font-runtime-config.test.js && node tests/font-runtime-collector.test.js && node tests/font-runtime-runner.test.js && node tests/font-runtime-integration.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/sass-compiler.test.js && node tests/directory-listing.test.js && node tests/svn-css-sync.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/build-author-header.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js && node tests/watcher-safety.test.js"
   },
   "keywords": [
     "mikit",
@@ -20,6 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@napi-rs/image": "^1.15.0",
+    "acorn": "^8.18.0",
     "autoprefixer": "^10.6.1",
     "chokidar": "^3.6.0",
     "clean-css": "^5.3.3",

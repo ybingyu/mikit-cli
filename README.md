@@ -39,10 +39,12 @@ npm install --save-dev mikit-cli
 
 ### 字体子集化依赖（仅字体功能需要）
 
-只有使用 `mikit build --minfont` 或 `mikit font` 时才需要 Python 依赖。每个有效字体固定生成 TTF、WOFF、WOFF2，因此建议一次安装 `fonttools` 和 `brotli`：
+只有使用 `mikit build --minfont` 或 `mikit font` 时才需要 Python 依赖。字体仅生成 CSS 本地 URL 引用的 TTF、WOFF、WOFF2 格式；需要 WOFF2 时额外安装 `brotli`：
 
 ```powershell
-py -m pip install fonttools brotli
+py -m pip install fonttools
+# 仅当 CSS 引用了 WOFF2 时：
+py -m pip install brotli
 pyftsubset --help
 ```
 
@@ -253,7 +255,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 | 基本构建 | `mikit build` | 复制和处理文件，编译 SCSS、展开 SSI，不进行压缩 |
 | 完整压缩 | `mikit build --min` | 执行基本构建，并对 HTML、CSS、JS 进行压缩 |
 | 仅压缩 CSS | `mikit build --mincss` | 执行基本构建，仅压缩 CSS |
-| 字体子集化 | `mikit build --minfont` | 构建后按字体族提取字符并裁剪本地 TTF |
+| 字体子集化 | `mikit build --minfont` | 构建后按字体族提取字符并裁剪本地字体 |
 | PNG 压缩 | `mikit build --png` | 构建后递归压缩输出目录中的 PNG；默认量化到最多 256 色，可配置为严格无损 |
 
 **构建选项：**
@@ -319,17 +321,17 @@ mikit font --output custom-dist
 mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 ```
 
-> `mikit font` 会直接修改已有构建输出中的字体文件。原始字体以 `wwwroot/font` 为准；构建输出中不再创建 `font/bak`，需要恢复时重新构建即可。
+> `mikit font` 会处理已有构建输出。所有字体和字符清单先在临时目录生成、验证，再一同发布；失败时保留原输出。成功后不保留长期备份，原始字体仍以 `wwwroot/font` 为准。
 
 #### 字体输入、映射和输出规则
 
-- 构建输出中必须存在 `font` 目录，否则命令报错。CSS 从同一输出目录的 `css` 目录递归扫描。
-- 字体进入子集化计划必须同时满足以下条件：文件是 `.ttf`、位于输出目录的 `font` 第一层、并且被 CSS 的本地 `url(...)` 引用。仅把字体文件放进 `font`、但没有被 CSS 本地引用时，会从构建输出中删除。
-- `@font-face` 的 `font-family` 用于把 CSS 字体族映射到实际字体文件；没有映射时回退到 TTF 文件名。`font-family` 有多个候选值时，只使用列表中的第一个字体族。
+- 构建输出中必须存在 `font` 目录，否则命令报错。CSS 从同一输出目录递归扫描 `**/*.css`（例如 `dist/css/`、`dist/scss/`），不读取源码 `.scss`。
+- 字体位于输出目录的 `font` 中（可嵌套子目录），并且被 CSS 的本地 `url(...)` 引用 TTF、WOFF 或 WOFF2 格式时才进入计划。每个 URL 相对所在 CSS 或内联 `<style>` 的 HTML 文件解析；仅放入 `font` 而未被本地引用的文件会被清理。
+- `@font-face` 的 `font-family` 用于把 CSS 字体族映射到实际字体文件；没有映射时回退到字体文件名。`font-family` 有多个候选值时，只使用列表中的第一个字体族。
 - CSS 中的 HTTP/HTTPS 远程字体不做子集化。若输出目录的 `font` 中存在仅由远程 URL 引用的同名字体文件，会直接从构建输出移除；同名字体同时存在本地引用时按本地字体处理。
 - 每个字体分别合并和去重字符，不会把所有字体共用一份字符清单。
-- 只有“被 CSS 本地引用且提取到至少 1 个字符”的字体会保留：生成同名 TXT，并在输出字体目录中只保留同名 TTF、WOFF、WOFF2；不会备份原始 TTF。
-- CSS 未引用或提取字符为 0 的字体都会从输出字体目录删除；零字符字体不生成 TXT、不调用 `pyftsubset`，并删除字符清单目录中的遗留同名 TXT。有效字体的 EOT、OTF、SVG 等非输出格式也会删除，因此字体处理完成后只保留有效字体的 TTF、WOFF、WOFF2。
+- 只有“被 CSS 本地引用且提取到至少 1 个字符”的字体会保留：按字体相对路径生成 TXT，并为每个字体只生成和保留它在本地 CSS 中引用的 TTF、WOFF、WOFF2 格式；不会备份原始字体。只有 WOFF 引用时必须有原始 WOFF，即使同名字体的 TTF 存在也不会代替；缺少可用输入会在清理字体前报出具体路径。
+- CSS 未引用或提取字符为 0 的字体都会从输出字体目录删除；零字符字体不生成 TXT、不调用 `pyftsubset`，并删除字符清单目录中的遗留同名 TXT。有效字体的 EOT、OTF、SVG 等非输出格式也会删除，因此字体处理完成后只保留有效字体在 CSS 中实际引用的格式。
 
 #### 静态 HTML 提取规则
 
@@ -339,16 +341,11 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 - `--font-page` 支持明确文件和 glob，例如 `index.html`、`pages/*.html`、`**/*.html`；传入后用于覆盖默认 SHTML 自动发现。指定模式没有匹配结果时，仍按兼容规则回退扫描输出目录根层的 `*.html`。匹配结果和动态 URL 映射出的本地 HTML 会去重后共同扫描。
 - 静态 CSS 匹配是轻量实现，不是完整浏览器 CSS 引擎。当前支持标签、ID、class、后代选择器、子选择器、字体继承、规则顺序、选择器优先级、`!important` 和内联 `font-family`；不应依赖复杂属性选择器或兄弟选择器进行字体识别。
 - HTML 中明确写出的字面文本都会参与扫描，包括 `v-if`、`v-else-if`、`v-else`、`v-show`、隐藏面板、未打开弹窗和 `<template>` 中的各状态文字。
-- Vue 的 `{{ ... }}` 插值表达式会整体忽略，避免把变量名和语法符号误当成页面字符。例如：
-
-```html
-<p>封魔之力达{{fmzl[user.user_type]}} <b>好运次数+2</b></p>
-```
-
-静态扫描只提取字面内容 `封魔之力达 好运次数+2`，不会提取 `fmzl`、`user_type`、`{{`、`[]`、`.` 等表达式内容。插值运行后显示的数字或文字，只能通过 `mikit.font.pages` 的动态页面结果补充；未配置动态 URL 时 Mikit 不会猜测运行值。
+- Vue 的 `{{ ... }}`、`v-text`、`v-html`、部分绑定属性及 `v-for` 会尝试从构建后页面的内联脚本和本地脚本中静态求出可见文字（包括已知条件分支），不把变量名直接当作字符。无法静态求值、脚本解析失败、接口返回或运行时计算的内容会记录为风险；可通过动态页面或按字体族手工补字覆盖。静态提取不等于完整运行时执行。
+- 默认 `asciiBaseline: "none"`：只保留页面确实提取到的字符和用户显式补字，不自动加入数字、ASCII 或其他保底字符。需要兼容未知数字、日期、英文状态时，可明确选择 `common` / `full`，或填写补字。
 
 - 纯缩进、换行等格式化空白不算有效字符；普通文本内部的连续空白归一为一个空格。
-- 静态扫描忽略 `script` 和 `style` 元素内容，也不从 HTML 属性值中提取文字。
+- 静态页面不直接把 `script`、`style` 的源码或普通 HTML 属性值当作可见文字；只对受支持的 Vue 可见绑定求值。
 
 #### 动态页面字符配置
 
@@ -367,7 +364,12 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
       "waitFor": "#app",
       "wait": 1000,
       "timeout": 15000,
-      "browserExecutable": ""
+      "browserExecutable": "",
+      "asciiBaseline": "none",
+      "dynamicTextPolicy": "warn",
+      "globalExtraText": "",
+      "familyExtraText": { "活动标题": "补充文案" },
+      "familyOptions": { "活动标题": { "asciiBaseline": "common" } }
     }
   }
 }
@@ -380,8 +382,13 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 | `wait` | `1000` | `waitFor` 完成后额外等待的毫秒数，必须是非负整数。 |
 | `timeout` | `15000` | 每页导航和 `waitFor` 的超时毫秒数，必须是正整数。 |
 | `browserExecutable` | `null` | Chrome/Edge 可执行文件路径；相对路径按项目根目录解析。省略或空字符串表示自动查找。 |
+| `asciiBaseline` | `"none"` | `none` 不补字；`common` 补常见数字及符号；`full` 补 ASCII 32–126。 |
+| `globalExtraText` | `""` | 明确补给所有字体族的字符。 |
+| `familyExtraText` | `{}` | 以 CSS 中的 `font-family` 为键，单独为字体族补字。 |
+| `familyOptions` | `{}` | 每个字体族覆盖 `asciiBaseline`，例如 `{ "活动标题": { "asciiBaseline": "common" } }`。 |
+| `dynamicTextPolicy` | `"warn"` | 静态求值存在未知动态文案时警告并继续；`error` 则终止且不发布。 |
 
-`mikit init` 默认只生成 `pages`、`wait`、`timeout`；`waitFor` 和 `browserExecutable` 需要时手动添加。
+`mikit init` 默认生成 `pages`、`wait`、`timeout` 及上述补字和动态风险策略字段；`waitFor` 和 `browserExecutable` 需要时手动添加。
 
 #### 动态提取边界和失败处理
 
@@ -404,7 +411,13 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 
 依次使用：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
 
-这是一套 Mikit 内置的确定性工具流程，不是 AI 猜字，也不需要为每个 URL 分别安装插件。生产字符只来自构建后的 HTML/CSS、明确配置的 URL 和页面实际渲染出的 DOM。
+字体字符来自构建后的 HTML/CSS 及可静态确定的 Vue/JS 展示文案、显式补字和已配置页面的实际 DOM，不从未配置的动态状态猜字。成功处理有效字体后，终端会提示报告的完整路径；打开项目 `font/font-report.json`，查看扫描来源、逐字体字符来源计数、输出格式与字节数，以及以下提示：
+
+- `fonts[].dynamicBinding` 表示该字体族检测到可见文字的动态绑定；`fonts[].missingDigits` 列出其字符清单尚未收集的 `0–9`，可能为空字符串。未收集不等于源字体缺字，也不能单独证明运行时页面缺字。
+- 仅当有动态绑定且存在未收集数字时，`fonts[].digitSuggestion` 才给出补字建议；否则为 `null`。这只是提示，默认 `asciiBaseline: "none"` 不会据此自动补数字。
+- `fonts[].verification.sourceMissing` 才用于判断源字体无法覆盖的请求字符；顶层 `risks` 用于查看仍无法确定的动态文案。
+
+先确认运行时文案是否可能出现提示的数字。若需要补字，在项目 `package.json > mikit.font` 中按 CSS 字体族配置 `"familyExtraText": { "活动标题": "23" }`（示例仅补运行时需要的字符）；也可以显式配置 `"familyOptions": { "活动标题": { "asciiBaseline": "common" } }`，或为需采集的状态补充 `pages`。随后重新执行字体处理，核对报告与实际页面；不要把报告中的未收集数字直接当作已发生的缺字。
 
 ## 核心功能
 
@@ -565,7 +578,12 @@ npm run sync:svn
       "waitFor": null,
       "wait": 1000,
       "timeout": 15000,
-      "browserExecutable": ""
+      "browserExecutable": "",
+      "asciiBaseline": "none",
+      "dynamicTextPolicy": "warn",
+      "globalExtraText": "",
+      "familyExtraText": { "活动标题": "补充文案" },
+      "familyOptions": { "活动标题": { "asciiBaseline": "common" } }
     }
   }
 }
@@ -741,7 +759,9 @@ mikit start --port 8085
 确认已经执行：
 
 ```powershell
-py -m pip install fonttools brotli
+py -m pip install fonttools
+# 仅当 CSS 引用了 WOFF2 时：
+py -m pip install brotli
 pyftsubset --help
 ```
 
@@ -756,7 +776,7 @@ pyftsubset --help
 - 本地服务已启动，URL 能在 Chrome/Edge 中访问。
 - 页面需要的状态 URL 已逐个列出；Mikit 不自动猜参数或点击按钮。
 - 如果数据异步渲染，配置正确的 `waitFor` 和足够的 `wait`。
-- 页面文字最终使用的第一个计算字体族，能映射到待处理的本地 TTF。
+- 页面文字最终使用的第一个计算字体族，能映射到待处理的本地字体。
 
 ### 6. 动态页面出现 404 时为什么没有日志
 

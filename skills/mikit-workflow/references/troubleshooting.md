@@ -74,7 +74,7 @@ For runtime page collection:
 - Verify Chrome or Edge is installed, or provide a valid `browserExecutable`.
 - A main page HTTP error fails collection; unrelated non-font resource errors may be ignored, while font resource HTTP failures are reported.
 
-After a successful font operation, verify the expected TTF, WOFF, and WOFF2 files rather than relying only on console text.
+After a successful font operation, follow the printed full path to `font/font-report.json`. A font's `dynamicBinding` and `missingDigits` (uncollected digits) may trigger `digitSuggestion`, but do not alone establish actual missing glyphs; `verification.sourceMissing` identifies source-font coverage gaps and top-level `risks` unresolved dynamic content. Confirm which runtime digits or states can occur before configuring explicit `pages`, per-family `familyExtraText`, or opting in to `familyOptions.<family>.asciiBaseline: "common"`. Default `asciiBaseline: "none"` never auto-adds digits. Rerun and check report and actual pages. Then verify only the TTF, WOFF, or WOFF2 files actually referenced for each font in built CSS, including CSS under `scss/` or other output folders. For WOFF-only references, ensure the original WOFF exists before running the command.
 
 ## PNG Problems
 

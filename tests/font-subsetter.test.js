@@ -27,6 +27,10 @@ function createOutputFixture(t, { files = [], directories = [] } = {}) {
         fs.unlinkSync(filePath);
       }
     });
+    const reportPath = path.join(outputDir, 'manifests', 'font-report.json');
+    if (fs.existsSync(reportPath)) fs.unlinkSync(reportPath);
+    const projectReportPath = path.join(fixtureRoot, 'font', 'font-report.json');
+    if (fs.existsSync(projectReportPath)) fs.unlinkSync(projectReportPath);
     directories.forEach((relativePath) => {
       const directoryPath = path.join(outputDir, relativePath);
       if (fs.existsSync(directoryPath)) {
@@ -585,10 +589,10 @@ test('removes every font except referenced fonts with extracted characters', (t)
 
   assert.deepEqual(result.processed, [usedFontPath]);
   assert.deepEqual(result.skipped, []);
-  ['used.ttf', 'used.woff', 'used.woff2'].forEach((fileName) => {
+  ['used.ttf'].forEach((fileName) => {
     assert.equal(fs.existsSync(path.join(fontDir, fileName)), true);
   });
-  ['used.eot', 'unused.ttf', 'unused.woff', 'unused.woff2', 'unused.svg'].forEach(
+  ['used.eot', 'used.woff', 'used.woff2', 'unused.ttf', 'unused.woff', 'unused.woff2', 'unused.svg'].forEach(
     (fileName) => {
       assert.equal(fs.existsSync(path.join(fontDir, fileName)), false);
     },
@@ -729,6 +733,7 @@ test("writes default manifests to the project font directory", (t) => {
   t.after(() => {
     [
       manifestPath,
+      path.join(manifestDir, 'font-report.json'),
       previousDefaultPath,
       path.join(outputFontDir, "display.ttf"),
       path.join(outputFontDir, "display.woff"),
@@ -781,10 +786,195 @@ test("passes a manifest path instead of inline Unicode", () => {
     "--output-file=C:\\project\\dist\\font\\local-subset.woff2",
     "--text-file=C:\\project\\font\\local.txt",
     "--layout-features=*",
+    "--name-IDs+=13,14",
+    "--name-languages=*",
+    "--name-legacy",
     "--flavor=woff2",
   ]);
   assert.equal(
     args.some((arg) => arg.startsWith("--unicodes=")),
     false,
   );
+});
+
+test('subsets a font declared in an HTML style block', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-inline-font-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dist = path.join(root, 'dist');
+  fs.mkdirSync(path.join(dist, 'font'), { recursive: true });
+  fs.writeFileSync(path.join(dist, 'font.html'),
+    '<style>@font-face{font-family:Inline;src:url(font/inline.ttf)}</style>' +
+    '<div style="font-family:Inline">字体测试</div>');
+  fs.writeFileSync(path.join(dist, 'font', 'inline.ttf'), 'source');
+  const result = subsetFonts({ projectDir: root, outputDir: dist,
+    commandRunner(command, args) {
+      const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
+      fs.writeFileSync(target, 'subset');
+      return { status: 0 };
+    },
+  });
+  assert.deepEqual(result.processed, [path.join(dist, 'font', 'inline.ttf')]);
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'inline.txt'), 'utf8'), '字体测试');
+});
+
+test('subsets nested referenced fonts and prunes unused nested files', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-nested-font-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dist = path.join(root, 'dist');
+  const fontDir = path.join(dist, 'font', 'boat');
+  fs.mkdirSync(fontDir, { recursive: true });
+  fs.mkdirSync(path.join(dist, 'css'));
+  fs.writeFileSync(path.join(dist, 'font.html'), '<div style="font-family:Boat">船政文字</div>');
+  fs.writeFileSync(path.join(dist, 'css', 'boat.css'),
+    '@font-face{font-family:Boat;src:url(../font/boat/regular.ttf)}');
+  fs.writeFileSync(path.join(fontDir, 'regular.ttf'), 'source');
+  fs.writeFileSync(path.join(fontDir, 'unused.ttf'), 'unused');
+  const result = subsetFonts({ projectDir: root, outputDir: dist,
+    commandRunner(command, args) {
+      const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
+      fs.writeFileSync(target, 'subset');
+      return { status: 0 };
+    },
+  });
+  assert.deepEqual(result.processed, [path.join(fontDir, 'regular.ttf')]);
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'boat', 'regular.txt'), 'utf8'), '船政文字');
+  assert.equal(fs.existsSync(path.join(fontDir, 'unused.ttf')), false);
+  assert.equal(fs.existsSync(path.join(fontDir, 'regular.woff2')), false);
+});
+
+test('keeps same-named nested fonts and manifests separate', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-names-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dist = path.join(root, 'dist');
+  for (const folder of ['a', 'b']) {
+    fs.mkdirSync(path.join(dist, 'font', folder), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'font', folder, 'common.ttf'), 'source');
+  }
+  fs.mkdirSync(path.join(dist, 'css'));
+  fs.writeFileSync(path.join(dist, 'css', 'site.css'),
+    '@font-face{font-family:One;src:url(../font/a/common.ttf)}' +
+    '@font-face{font-family:Two;src:url(../font/b/common.ttf)}');
+  fs.writeFileSync(path.join(dist, 'index.html'),
+    '<span style="font-family:One">甲</span><span style="font-family:Two">乙</span>');
+  const result = subsetFonts({ projectDir: root, outputDir: dist,
+    commandRunner(command, args) {
+      const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
+      fs.writeFileSync(target, 'subset');
+      return { status: 0 };
+    },
+  });
+  assert.equal(result.processed.length, 2);
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'a', 'common.txt'), 'utf8'), '甲');
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'b', 'common.txt'), 'utf8'), '乙');
+});
+
+function createFormatFixture(t, cssByPath, fonts) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-formats-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dist = path.join(root, 'dist');
+  for (const [relativePath, content] of Object.entries({
+    'index.html': '<span style="font-family:Boat">甲乙</span>' +
+      '<span style="font-family:Other">丙丁</span>',
+    ...cssByPath,
+  })) {
+    const target = path.join(dist, relativePath);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+  }
+  for (const file of fonts) {
+    const target = path.join(dist, 'font', file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, `original ${file}`);
+  }
+  const calls = [];
+  const run = () => subsetFonts({ projectDir: root, outputDir: dist,
+    commandRunner(command, args) {
+      calls.push(args);
+      const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
+      fs.writeFileSync(target, 'subset');
+      return { status: 0 };
+    },
+  });
+  return { root, dist, calls, run };
+}
+
+test('finds compiled CSS under dist/scss and keeps only the referenced WOFF and TTF', (t) => {
+  const fixture = createFormatFixture(t, {
+    'scss/boat.css': '@font-face{font-family:Boat;src:' +
+      'url(../font/boat/regular.woff) format("woff"),' +
+      'url(../font/boat/regular.ttf) format("truetype")}' +
+      '.boat{font-family:Boat}',
+  }, ['boat/regular.ttf', 'boat/regular.woff', 'boat/regular.woff2']);
+  const result = fixture.run();
+  assert.deepEqual(result.processed, [path.join(fixture.dist, 'font', 'boat', 'regular.ttf')]);
+  assert.equal(fixture.calls.length, 2);
+  assert.deepEqual(fixture.calls.map((args) =>
+    path.extname(args.find((arg) => arg.startsWith('--output-file=')).slice(14))),
+  ['.ttf', '.woff']);
+  assert.equal(fs.existsSync(path.join(fixture.dist, 'font', 'boat', 'regular.woff2')), false);
+  assert.equal(fs.readFileSync(path.join(fixture.root, 'font', 'boat', 'regular.txt'), 'utf8'), '甲乙');
+});
+
+test('subsets a WOFF-only font from its original WOFF without generating other formats', (t) => {
+  const fixture = createFormatFixture(t, {
+    'styles/site.css': '@font-face{font-family:Boat;src:url(../font/boat.woff)}',
+  }, ['boat.woff']);
+  const result = fixture.run();
+  const fontDir = path.join(fixture.dist, 'font');
+  assert.deepEqual(result.processed, [path.join(fontDir, 'boat.woff')]);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(path.basename(fixture.calls[0][0]), 'boat.woff');
+  assert.notEqual(fixture.calls[0][0], path.join(fontDir, 'boat.woff'));
+  assert.equal(fs.existsSync(path.join(fontDir, 'boat.woff')), true);
+  assert.equal(fs.existsSync(path.join(fontDir, 'boat.ttf')), false);
+  assert.equal(fs.existsSync(path.join(fontDir, 'boat.woff2')), false);
+});
+
+test('fails with the missing WOFF path before pruning any fonts', (t) => {
+  const fixture = createFormatFixture(t, {
+    'site.css': '@font-face{font-family:Boat;src:url(font/boat.woff)}',
+  }, ['boat.ttf', 'other.ttf']);
+  assert.throws(fixture.run, (error) =>
+    error.message.includes(path.join(fixture.dist, 'font', 'boat.woff')));
+  assert.equal(fixture.calls.length, 0);
+  assert.equal(fs.readFileSync(path.join(fixture.dist, 'font', 'other.ttf'), 'utf8'), 'original other.ttf');
+  assert.equal(fs.readFileSync(path.join(fixture.dist, 'font', 'boat.ttf'), 'utf8'), 'original boat.ttf');
+});
+
+test('tracks output formats separately for fonts found in distinct CSS directories', (t) => {
+  const fixture = createFormatFixture(t, {
+    'site.css': '@font-face{font-family:Boat;src:url(font/boat.woff)}',
+    'other/deep/site.css': '@font-face{font-family:Other;src:url(../../font/other.ttf)}',
+  }, ['boat.woff', 'other.ttf']);
+  fixture.run();
+  assert.equal(fixture.calls.length, 2);
+  assert.equal(fs.existsSync(path.join(fixture.dist, 'font', 'boat.ttf')), false);
+  assert.equal(fs.existsSync(path.join(fixture.dist, 'font', 'other.woff')), false);
+  assert.equal(fs.readFileSync(path.join(fixture.root, 'font', 'other.txt'), 'utf8'), '丙丁');
+});
+
+
+test('keeps a WOFF input when pyftsubset cannot read it and reports its path', (t) => {
+  const fixture = createFormatFixture(t, {
+    'site.css': '@font-face{font-family:Boat;src:url(font/boat.woff)}',
+  }, ['boat.woff']);
+  const source = path.join(fixture.dist, 'font', 'boat.woff');
+  assert.throws(() => subsetFonts({ projectDir: fixture.root, outputDir: fixture.dist,
+    commandRunner(command, args) {
+      fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'partial');
+      return { status: 1 };
+    },
+  }), (error) => error.message.includes(source));
+  assert.equal(fs.readFileSync(source, 'utf8'), 'original boat.woff');
+  assert.equal(fs.existsSync(path.join(fixture.dist, 'font', 'boat-subset.woff')), false);
+});
+
+test('outputs WOFF2 only when WOFF2 alone is referenced', (t) => {
+  const fixture = createFormatFixture(t, {
+    'css/site.css': '@font-face{font-family:Boat;src:url(../font/boat.woff2)}',
+  }, ['boat.woff2']);
+  const result = fixture.run();
+  assert.deepEqual(result.processed, [path.join(fixture.dist, 'font', 'boat.woff2')]);
+  assert.deepEqual(fixture.calls[0].filter((arg) => arg.startsWith('--flavor=')), ['--flavor=woff2']);
+  assert.equal(fixture.calls.length, 1);
 });

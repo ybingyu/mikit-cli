@@ -41,6 +41,11 @@ test('exports the frozen static default configuration', () => {
     wait: 1000,
     timeout: 15000,
     browserExecutable: null,
+    asciiBaseline: 'none',
+    dynamicTextPolicy: 'warn',
+    globalExtraText: '',
+    familyExtraText: {},
+    familyOptions: {},
   });
   assert.equal(Object.isFrozen(DEFAULT_FONT_RUNTIME_CONFIG), true);
   assert.equal(Object.isFrozen(DEFAULT_FONT_RUNTIME_CONFIG.pages), true);
@@ -128,6 +133,11 @@ test('loads and normalizes configured runtime font pages', () => {
       wait: 250,
       timeout: 5000,
       browserExecutable: browserPath,
+      asciiBaseline: 'none',
+      dynamicTextPolicy: 'warn',
+      globalExtraText: '',
+      familyExtraText: {},
+      familyOptions: {},
     });
   } finally {
     cleanup(dir, ['package.json', 'browser.exe']);

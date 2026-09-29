@@ -67,3 +67,20 @@ test("font command formats runtime configuration errors without a stack", (t) =>
   assert.match(result.stderr, /^\[mikit font\] /m);
   assert.doesNotMatch(result.stderr, /\n\s+at /);
 });
+
+
+test('font command reports a missing WOFF input with its path and no stack', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-missing-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dist = path.join(root, 'dist');
+  fs.mkdirSync(path.join(dist, 'font'), { recursive: true });
+  fs.writeFileSync(path.join(dist, 'site.css'),
+    '@font-face{font-family:Boat;src:url(font/boat.woff)}');
+  const result = spawnSync(process.execPath, [cliPath, 'font'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^\[mikit font\] .*boat\.woff/m);
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
+});

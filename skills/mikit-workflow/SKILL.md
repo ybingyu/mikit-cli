@@ -80,12 +80,12 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 - Treat `mikit.png.mode: "quantize"` with `colors: 256` as the recommended default, not as lossless compression. Use `mode: "lossless"` only when the user requires pixel-identical output.
 - For font subsetting, keep the default static discovery unless the user explicitly needs a narrower page set: Mikit scans `wwwroot/**/*.shtml`, excludes files whose basename starts with `_`, and maps each source page to the same-path `.html` in the build output. Use `--font-page` only to override this static discovery; do not require a dedicated `font.shtml`.
 - Decide whether dynamic font collection needs a user follow-up:
-  - If the project appears static, keep `mikit.font.pages` omitted or empty and explain that font collection is static-only; do not ask for runtime URLs without a concrete reason.
+  - If the project appears static, keep `mikit.font.pages` omitted or empty and explain that font collection includes built HTML and statically resolvable Vue/JS visible copy; do not ask for runtime URLs without a concrete reason.
   - Treat Vue interpolation/directives, API-rendered copy, conditional states, button-triggered panels, rankings, countdowns, login states, or JavaScript-written text as signals that static scanning may be incomplete. These signals justify a question, not automatic configuration.
   - If the user already supplied complete HTTP/HTTPS URLs, validate and use them without asking the same question again.
   - If project files expose only candidate routes or query states, list those candidates and ask the user to confirm the complete URLs, including host, port, and every required state. Do not invent query parameters, state values, click sequences, authentication, or page coverage.
   - After URLs are confirmed, ask for `waitFor`, `wait`, `timeout`, or `browserExecutable` only when the page behavior requires non-default values.
-  - If the user declines dynamic collection or cannot yet provide URLs, leave `pages` empty and clearly report that Vue/API/runtime-only text is not covered.
+  - If the user declines dynamic collection or cannot yet provide URLs, leave `pages` empty and clearly report that unresolved Vue/API/runtime-only text is not covered.
 - `mikit.font.pages` is the browser-based dynamic collection setting and accepts complete HTTP/HTTPS URLs. `--font-page` only overrides the static built-HTML page set and must not be presented as a substitute.
 - Preserve legacy `mikit.syncSvn.target` when it is already valid. Use `targets` for multiple destinations, and never configure both fields.
 - Interpret `mikit.syncSvn.files: ["*"]` as direct CSS files only, not arbitrary files or recursive content.
@@ -94,7 +94,7 @@ Use `mikit --help` or `mikit <command> --help` when command support or options a
 ## Respect Mutation Boundaries
 
 - Building may replace the configured build output. Packing resets its configured output directory after input preflight. Run these commands only when the user requested the corresponding generated artifact.
-- `mikit replace`, `mikit png`, and `mikit font` modify configured generated files in place. Confirm that the configured root is the intended output before running them. `mikit font` removes fonts that are not locally referenced by CSS or produce zero extracted characters, and leaves only TTF, WOFF, and WOFF2 for retained fonts.
+- `mikit replace`, `mikit png`, and `mikit font` modify configured generated files in place. Confirm that the configured root is the intended output before running them. `mikit font` removes fonts that are not locally referenced by CSS or produce zero extracted characters, and keeps only the TTF, WOFF, or WOFF2 formats locally referenced for each retained font.
 - `mikit sync-svn` performs the configured copy directly. It must not run `svn add`, `svn delete`, `svn commit`, create missing SVN directories, or delete content.
 - Do not manually edit generated output to imitate a successful command. Fix source or configuration and rerun the CLI.
 
@@ -106,7 +106,7 @@ After a mutating command:
 2. Confirm expected output directories or files exist.
 3. For configuration edits, parse `package.json` and inspect the focused diff.
 4. For builds, packing, PNG, replacement, or font operations, inspect representative artifacts relevant to the request. When either the project or global author is configured, verify representative CSS and JavaScript headers and confirm Sass-generated CSS uses the same compile timestamp.
-5. For font subsetting, verify that only CSS-referenced fonts with non-zero extracted characters remain, with TTF, WOFF, and WOFF2 outputs for each retained font.
+5. For font subsetting, open `font/font-report.json` at the full path printed after successful processing. Inspect each font's `dynamicBinding`, `missingDigits`, and `digitSuggestion`: missing digits are uncollected characters, not proof of source-font or actual page missing glyphs. Check `verification.sourceMissing` for source-font coverage and top-level `risks` for unresolved dynamic copy. Confirm possible runtime states before suggesting explicit `pages`, per-family `familyExtraText`, or an opt-in `familyOptions.<family>.asciiBaseline: "common"`; default `none` never silently adds fallback digits. Rerun and inspect the report and actual pages. Verify that only CSS-referenced fonts with non-zero extracted characters remain, with outputs limited to each font's locally referenced formats in the built CSS (including `scss/` or other output folders).
 6. For SVN synchronization, report target count and copied/skipped counts; do not claim an SVN commit occurred.
 7. Run proportionate syntax, project tests, or `git diff --check` when repository files were changed.
 
