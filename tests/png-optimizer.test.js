@@ -393,14 +393,22 @@ function testRealLosslessCompressionAndErrors() {
   try {
     writePackage(invalidProjectDir, { root: 'dist', mode: 'lossless', level: 'balanced', exclude: [] });
     write(path.join(invalidProjectDir, 'dist/img/broken.png'), Buffer.from('not a png'));
-    assert.throws(
-      () => optimizePngImages({ projectDir: invalidProjectDir }),
-      /PNG 压缩失败（img\/broken\.png）：/
-    );
+    const validPath = path.join(invalidProjectDir, 'dist/img/valid.png');
+    const original = createUncompressedRgbaPng();
+    write(validPath, original);
+    const summary = optimizePngImages({ projectDir: invalidProjectDir });
+    assert.equal(summary.failed.length, 1);
+    assert.equal(summary.failed[0].relativePath, 'img/broken.png');
+    assert.equal(summary.failed[0].filePath, path.join(invalidProjectDir, 'dist/img/broken.png'));
+    assert.match(summary.failed[0].message, /PNG|decode|signature|libpng/i);
+    assert.equal(summary.optimized, 1);
+    assert.deepEqual(fs.readFileSync(path.join(invalidProjectDir, 'dist/img/broken.png')), Buffer.from('not a png'));
+    assert.ok(fs.statSync(validPath).size < original.length);
+    assert.match(formatPngSummary(summary), /失败跳过 1 个/);
   } finally {
     cleanup(
       invalidProjectDir,
-      ['package.json', 'dist/img/broken.png'],
+      ['package.json', 'dist/img/broken.png', 'dist/img/valid.png'],
       ['dist/img', 'dist', '.']
     );
   }

@@ -108,5 +108,43 @@ function testBuildReportsMissingPngConfigWithoutStackTrace() {
   }
 }
 
+function testBuildAndPngSkipInvalidFileAndReportPath() {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-build-invalid-'));
+  const broken = Transformer.fromRgbaPixels(Buffer.alloc(32 * 32 * 4, 128), 32, 32).jpegSync();
+  try {
+    write(path.join(projectDir, 'package.json'), JSON.stringify({
+      name: 'png-build-invalid', version: '1.0.0',
+      mikit: { png: { root: 'custom-dist', mode: 'quantize', exclude: [] } }
+    }));
+    write(path.join(projectDir, 'wwwroot', 'img', 'a-broken.png'), broken);
+    write(path.join(projectDir, 'wwwroot', 'img', 'nested', 'another-broken.png'), Buffer.from('not a png'));
+    write(path.join(projectDir, 'wwwroot', 'img', 'z-valid.png'), createPng());
+
+    const build = runBuild(projectDir);
+    assert.equal(build.status, 0, build.stderr);
+    assert.match(build.stdout, /Build completed successfully/);
+    assert.match(build.stdout, /失败跳过 2 个/);
+    assert.match(build.stderr, /\[mikit build\].*a-broken\.png/);
+    assert.ok(build.stderr.includes(path.join(projectDir, 'custom-dist', 'img', 'a-broken.png')));
+    assert.ok(build.stderr.includes(path.join(projectDir, 'custom-dist', 'img', 'nested', 'another-broken.png')));
+    assert.deepEqual(fs.readFileSync(path.join(projectDir, 'custom-dist', 'img', 'a-broken.png')), broken);
+    assert.equal(fs.existsSync(path.join(projectDir, 'custom-dist', 'img', 'z-valid.png')), true);
+
+    const png = spawnSync(process.execPath, [cliPath, 'png'], { cwd: projectDir, encoding: 'utf8' });
+    assert.equal(png.status, 0, png.stderr);
+    assert.match(png.stdout, /失败跳过 2 个/);
+    assert.match(png.stderr, /\[mikit png\].*a-broken\.png/);
+    assert.ok(png.stderr.includes(path.join(projectDir, 'custom-dist', 'img', 'a-broken.png')));
+    assert.ok(png.stderr.includes(path.join(projectDir, 'custom-dist', 'img', 'nested', 'another-broken.png')));
+  } finally {
+    cleanup(projectDir,
+      ['package.json', 'wwwroot/img/a-broken.png', 'wwwroot/img/nested/another-broken.png', 'wwwroot/img/z-valid.png',
+        'custom-dist/img/a-broken.png', 'custom-dist/img/nested/another-broken.png', 'custom-dist/img/z-valid.png'],
+      ['custom-dist/img/nested', 'custom-dist/img', 'custom-dist', 'wwwroot/img/nested', 'wwwroot/img', 'wwwroot', '.']
+    );
+  }
+}
+
 testBuildUsesActualOutputDirectory();
+testBuildAndPngSkipInvalidFileAndReportPath();
 testBuildReportsMissingPngConfigWithoutStackTrace();

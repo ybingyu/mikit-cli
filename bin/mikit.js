@@ -89,8 +89,9 @@ program
   .description('Optimize PNG images using package.json mikit.png config')
   .action(() => {
     runWorkflowCommand('png', () => {
-      const { optimizePngImages, formatPngSummary } = require('../lib/png-optimizer');
+      const { optimizePngImages, formatPngSummary, reportPngFailures } = require('../lib/png-optimizer');
       const summary = optimizePngImages({ projectDir: process.cwd() });
+      reportPngFailures(summary, 'png');
       console.log('[mikit png] 完成：' + formatPngSummary(summary));
     });
   });
