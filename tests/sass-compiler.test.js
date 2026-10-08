@@ -112,6 +112,38 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
     assert.equal(indentedResponse.statusCode, 200, getServerOutput());
     assert.match(indentedResponse.body, /color:\s*#cc3300/);
 
+    fs.writeFileSync(
+      path.join(cssDir, '_keyframes.scss'),
+      '@mixin keyframes($name) { @keyframes #{$name} { @content; } }\n'
+    );
+    fs.writeFileSync(
+      path.join(cssDir, 'broken.scss'),
+      '@import "keyframes";\n$scale: 2;\n.old { width: 1/$scale; }\n' +
+      '@import "broken-animation";\n'
+    );
+    fs.writeFileSync(
+      path.join(cssDir, '_broken-animation.scss'),
+      '@include keyframes(vsIn) {\n  form { opacity: 0; }\n  to { opacity: 1; }\n}\n'
+    );
+    const brokenResponse = await request(port, '/css/broken.css');
+    assert.equal(brokenResponse.statusCode, 500, getServerOutput());
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const output = getServerOutput();
+    const errorLabel = '[mikit start] Sass 编译错误';
+    const warningLabel = '[mikit start] Sass 弃用警告 [slash-div]';
+    assert.ok(output.includes(errorLabel), output);
+    assert.ok(output.includes(path.join(cssDir, '_broken-animation.scss') + ':2:'), output);
+    assert.match(output, /2\s*\|\s*form \{ opacity: 0; \}/);
+    assert.ok(output.includes(warningLabel), output);
+    assert.ok(output.indexOf(errorLabel) < output.indexOf(warningLabel), output);
+
+    fs.writeFileSync(path.join(cssDir, 'broken-var.scss'), '.x { color: $unknown; }\n');
+    const variableResponse = await request(port, '/css/broken-var.css');
+    assert.equal(variableResponse.statusCode, 500, getServerOutput());
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.ok(getServerOutput().includes(path.join(cssDir, 'broken-var.scss') + ':1:'), getServerOutput());
+    assert.match(getServerOutput(), /1\s*\|\s*\.x \{ color: \$unknown; \}/);
+
     const packageJson = require(path.join(repoRoot, 'package.json'));
     assert.equal(packageJson.dependencies['node-sass'], undefined);
     assert.equal(typeof packageJson.dependencies.sass, 'string');

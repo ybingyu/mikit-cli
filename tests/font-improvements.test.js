@@ -17,6 +17,31 @@ function fixture(t) {
   return root;
 }
 
+test('subsets stylesheet and inline font shorthand and publishes exact character reports', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'style.css'),
+    '@font-face{font-family:A;src:url(font/a.ttf)}' +
+    '@font-face{font-family:B;src:url(font/b.ttf)}' +
+    '.a{font:400 clamp(14px,1.35vw,20px)/1.5 A,sans-serif}');
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<span class="a">甲</span><span style="font:400 .65em/1 B,sans-serif">12</span>');
+  const result = subsetFonts({ projectDir: root, commandRunner(_command, args) {
+    fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
+    return { status: 0 };
+  } });
+  assert.equal(result.processed.length, 2);
+  assert.equal(result.skipped.length, 0);
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'a.txt'), 'utf8'), '甲');
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'b.txt'), 'utf8'), '12');
+  for (const name of ['a', 'b']) {
+    assert.equal(fs.readFileSync(path.join(root, 'dist', 'font', name + '.ttf'), 'utf8'), 'subset');
+  }
+  const report = JSON.parse(fs.readFileSync(result.report, 'utf8'));
+  assert.equal(report.asciiBaseline, 'none');
+  assert.deepEqual(report.fonts.map((font) => [font.family, font.characters]), [['A', 1], ['B', 2]]);
+  assert.equal(report.fonts.find((font) => font.family === 'B').missingDigits, '03456789');
+});
+
 test('a later subset failure leaves every original font and manifest untouched', (t) => {
   const root = fixture(t);
   const manifest = path.join(root, 'font');

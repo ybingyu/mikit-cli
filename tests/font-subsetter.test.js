@@ -78,6 +78,99 @@ test("collects characters by computed font family", () => {
   });
 });
 
+function collectStyledCharacters(html, css, families = ['Display', 'Other']) {
+  return collectFontCharacters({
+    htmlContents: [html],
+    cssFiles: [{ content: css }],
+    fontFamilies: new Set(families),
+  });
+}
+
+test('collects hdl10web characters from font shorthand without redundant font-family', () => {
+  const result = collectStyledCharacters(
+    '<div id="sec-index"><div class="hero-meta"><b class="label">海选赛</b>' +
+      '<div class="value">10.9 –862,<span>点券</span></div></div></div>',
+    '#sec-index .hero-meta .label{font:400 clamp(14px,1.35vw,20px)/1.5 "AlimamaShuHeiTi-Bold","Microsoft YaHei",sans-serif}' +
+      '#sec-index .hero-meta .value{font:400 clamp(26px,3vw,44px)/1.2 "BebasNeue-Regular",sans-serif}' +
+      '#sec-index .hero-meta .value span{font:400 .65em/1 "AlimamaShuHeiTi-Bold",sans-serif}',
+    ['AlimamaShuHeiTi-Bold', 'BebasNeue-Regular'],
+  );
+  assert.deepEqual(result, {
+    'AlimamaShuHeiTi-Bold': '海选赛点券',
+    'BebasNeue-Regular': '10.9 –862,',
+  });
+});
+
+for (const value of [
+  '16px Display, sans-serif',
+  'italic small-caps 700 condensed 16px / 1.5 Display, sans-serif',
+  'normal 400 .65em/normal "Display", sans-serif',
+  'bold calc(1rem + min(2vw, 8px)) / calc(1 + .2) Display',
+  'oblique 10deg medium/120% Display',
+  'oblique 10deg medium Display',
+  '75% 16px Display',
+]) {
+  test('collects font shorthand: ' + value, () => {
+    assert.equal(collectStyledCharacters('<b>甲<span>乙</span></b>', 'b{font:' + value + '}').Display, '甲乙');
+  });
+}
+
+test('collects inline font shorthand and quoted family names with punctuation', () => {
+  const result = collectStyledCharacters(
+    '<span style="font:italic 16px/1.5 &quot;Display / Semi; Bold&quot;,sans-serif">甲</span>' +
+      '<b style="font: 18px Display Font">乙</b>', '',
+    ['Display / Semi; Bold', 'Display Font'],
+  );
+  assert.deepEqual(result, { 'Display / Semi; Bold': '甲', 'Display Font': '乙' });
+});
+
+for (const [declarations, family] of [
+  ['font-family:Other;font:16px Display', 'Display'],
+  ['font:16px Display;font-family:Other', 'Other'],
+  ['font:16px Other;font:18px Display', 'Display'],
+  ['font-family:Other!important;font:16px Display', 'Other'],
+  ['font:16px Display!important;font-family:Other', 'Display'],
+  ['font:16px Other!important;font-family:Display!important', 'Display'],
+  ['font-family:Other;font:16px', 'Other'],
+  ['font-family:Other;font:400/1.5 Display', 'Other'],
+  ['font:var(--heading-font)', null],
+  ['font-family:Display;font:caption', null],
+  ['font-family:Display;font:initial', null],
+]) {
+  test('resolves font declaration order and resets: ' + declarations, () => {
+    for (const [html, css] of [
+      ['<span>甲</span>', 'span{' + declarations + '}'],
+      ['<span style="' + declarations + '">甲</span>', ''],
+    ]) {
+      const result = collectStyledCharacters(html, css);
+      assert.equal(result.Display, family === 'Display' ? '甲' : '');
+      assert.equal(result.Other, family === 'Other' ? '甲' : '');
+    }
+  });
+}
+
+test('font shorthand follows selector specificity, source order and inherited family', () => {
+  const result = collectStyledCharacters(
+    '<div class="panel"><b class="other">甲<span>乙</span></b><i>丙</i></div>',
+    '.panel{font:16px Display}.other{font:16px Display}.panel .other{font:18px Other}' +
+      '.other{font:20px Display}.panel i{font:inherit}',
+  );
+  assert.deepEqual(result, { Display: '丙', Other: '甲乙' });
+});
+
+for (const [inline, rule, family] of [
+  ['font:16px Display', 'font:18px Other', 'Display'],
+  ['font:16px Display', 'font:18px Other!important', 'Other'],
+  ['font:16px Display!important', 'font-family:Other!important', 'Display'],
+  ['font-family:Display', 'font:18px Other!important', 'Other'],
+]) {
+  test('resolves inline and stylesheet font priority: ' + inline + ' / ' + rule, () => {
+    const result = collectStyledCharacters('<b style="' + inline + '">甲</b>', 'b{' + rule + '}');
+    assert.equal(result[family], '甲');
+    assert.equal(result[family === 'Display' ? 'Other' : 'Display'], '');
+  });
+}
+
 test("collects characters from child combinator selectors", () => {
   const characters = collectFontCharacters({
     htmlContents: [

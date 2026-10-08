@@ -27,7 +27,7 @@ function request(pathname) {
         body += chunk;
       });
       res.on('end', () => {
-        resolve({ statusCode: res.statusCode, body });
+        resolve({ statusCode: res.statusCode, headers: res.headers, body });
       });
     }).on('error', reject);
   });
@@ -118,6 +118,10 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
     const chineseHtmlResponse = await request(`/${encodeURIComponent(chineseHtmlName)}`);
     assert.strictEqual(chineseHtmlResponse.statusCode, 200);
     assert.match(chineseHtmlResponse.body, /中文页面/);
+
+    const distNoSlashResponse = await request('/dist');
+    assert.strictEqual(distNoSlashResponse.statusCode, 302);
+    assert.strictEqual(distNoSlashResponse.headers.location, '/dist/');
 
     const distResponse = await request('/dist/');
     assert.strictEqual(distResponse.statusCode, 200);
