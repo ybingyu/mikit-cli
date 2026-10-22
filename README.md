@@ -177,10 +177,11 @@ http://project-c.y.bindyy.cn:8080
 **Alias 子域名映射模式：**
 如果项目目录名包含中文、空格，或者项目不是标准的 `项目名/wwwroot` 结构，可以使用 alias 配置把子域名前缀映射到真实目录。这样不用调整原项目结构，也能保持同一个访问端口。
 
-例如在 `F:\NDW` 下创建 `mikit.alias.json`：
+例如在 `F:\NDW` 下创建 `mikit.alias.json`（以下目录和作者均为示例）：
 
 ```json
 {
+  "root": "F:/NDW",
   "author": "全局作者(工号)",
   "domain": "y.bindyy.cn",
   "port": 8080,
@@ -211,19 +212,69 @@ lxzh.y.bindyy.cn
 
 `projects` 仍然可以保留，用来处理需要自定义别名、覆盖自动别名、或者目录不符合扫描规则的项目。
 
-启动服务：
+#### alias 配置项怎么写
 
-```bash
-mikit start --port 8080 --root "F:\NDW" --alias "F:\NDW\mikit.alias.json"
-```
+| 配置项 | 写法示例 | 用途与规则 |
+|---|---|---|
+| `root` | `"F:/NDW"` | 项目统一根目录。想从任意目录启动时请填写绝对路径；auto 和 projects 的相对路径以此为基准。未设置时使用 --root，未传 --root 时使用启动目录。相对 root 按启动目录解析，不按 JSON 所在目录解析。 |
+| `port` | `8080` | 端口使用数字，例如 8080 或 8084。优先级：命令行 --port > JSON 的 port > 8080。 |
+| `domain` | `"y.bindyy.cn"` | 子域名的基础域名，不含协议、端口或项目名前缀。当前 CLI 默认传入 y.bindyy.cn，仅修改 JSON 不会切换域名；自定义域名需显式传 --domain，并配置 DNS 或 hosts。 |
+| `default` | `"wjms"` | 默认项目的别名，必须是实际加载成功的别名。访问 localhost 或未匹配的主机名时使用它；省略时使用第一个加载的项目。 |
+| `auto` | `["【魔域】/2026/*/*/wwwroot"]` | 可选的自动扫描规则，建议使用数组；也支持单个字符串。整段 * 只匹配一级目录，不支持 ** 或部分目录名通配。以 wwwroot 结尾，使用其父目录名生成别名。无需扫描时写 []。 |
+| `projects` | `{"wjms": "【魔域】/2026/0518 拉新召回/lxzh/wwwroot"}` | 手动别名映射，可指向项目目录或 wwwroot，也可使用绝对路径。别名建议用小写英文字母、数字及中间的连字符；手动配置覆盖同名自动别名。仅自动扫描时写 {}。 |
+| `author` | `"全局作者(工号)"` | 可选的全局构建作者，与启动服务无关。项目作者存在时用作 Editor；项目作者为空时用作 Author。不需要时省略或写空字符串。 |
 
-当项目位于 `mikit.alias.json` 所在目录或其子目录时，`mikit start`、`mikit serve` 和 `mikit build` 会从当前根目录向上自动查找最近的 `mikit.alias.json`。因此像 `F:\NDW\【魔域】\网吧\wb` 这样的项目可以直接读取 `F:\NDW\mikit.alias.json`，不依赖 IDE 是否继承了环境变量。也可以把 alias 配置路径保存为当前 Windows 用户环境变量：
+以上路径、作者和项目名均为示例，请按实际目录填写；已有配置只补齐需要的字段，不要覆盖原有映射。这些字段放在独立的 `mikit.alias.json` 顶层，不放进 `package.json > mikit`；`mikit init` 不会创建这个文件。即使不配置手动别名，也建议保留 `"projects": {}`。
+
+#### 配置一次，以后只运行 mikit start
+
+适用于已安装全局 `mikit`、希望从 `C:\Users\ND` 等任意目录启动统一项目服务的情况。上面的 JSON 已设置绝对路径 `root`、`port` 和默认域名，下面只需告诉 Mikit 去哪里读取它。
+
+**1. 保存并检查配置，设置环境变量。** 在 PowerShell 中执行，示例路径需替换成实际路径：
 
 ```powershell
-[Environment]::SetEnvironmentVariable('MIKIT_ALIAS_CONFIG', 'F:\NDW\mikit.alias.json', 'User')
+# 示例路径；先替换成你实际保存的配置文件路径
+$aliasPath = 'F:\NDW\mikit.alias.json'
+Test-Path -LiteralPath $aliasPath -PathType Leaf
+Get-Content -LiteralPath $aliasPath -Raw | ConvertFrom-Json
+
+# 确认文件存在且 JSON 可解析后，保存到当前 Windows 用户
+[Environment]::SetEnvironmentVariable('MIKIT_ALIAS_CONFIG', $aliasPath, 'User')
+
+# 让当前 PowerShell 窗口立即生效
+$env:MIKIT_ALIAS_CONFIG = $aliasPath
 ```
 
-读取优先级为：显式 `--alias`、`MIKIT_ALIAS_CONFIG`、从当前根目录向上自动发现的最近 `mikit.alias.json`。用户环境变量不会自动进入已经打开的终端，但自动发现不依赖环境变量。
+`Test-Path` 应返回 `True`，JSON 解析不应报错。`MIKIT_ALIAS_CONFIG` 的值是 JSON 文件的完整路径，不是项目目录；它也是全局作者配置的读取入口，不只用于作者注释。
+
+保存用户环境变量不会更新已打开的终端或 IDE。上面的 `$env:` 赋值只影响当前 PowerShell 及其子进程；后续新进程会在读取到更新后的用户环境时生效。如果从旧 IDE 或终端程序新开的窗口仍读不到变量，请完全退出并重新打开该程序，或在当前窗口执行 `$env:` 赋值。
+
+**2. 核对后直接启动。**
+
+```powershell
+$env:MIKIT_ALIAS_CONFIG
+[Environment]::GetEnvironmentVariable('MIKIT_ALIAS_CONFIG', 'User')
+mikit start
+```
+
+前两行分别显示当前进程和用户持久保存的值，应指向同一份配置。启动后核对 `Alias config:` 是否为该文件、`Loaded projects:` 是否包含预期别名，以及访问地址的端口是否正确；不要仅凭 `Project root:` 判断 alias 的根目录，它可能仍显示启动目录。完成后按 Ctrl+C 停止服务。
+
+**3. 只在项目根目录或其子目录启动时，可以不设环境变量。** `mikit start`、`mikit serve` 和 `mikit build` 会从当前根目录向上查找最近的 `mikit.alias.json`。例如在 `F:\NDW` 或其子目录启动时可以找到该文件；在 `C:\Users\ND` 启动不会自动搜索到另一个盘的 `F:\NDW`。JSON 仍建议保留绝对路径 `root`，避免从子目录启动时项目相对路径改变。
+
+配置文件选择优先级：显式 `--alias`（支持该选项的命令）> `MIKIT_ALIAS_CONFIG` > 向上自动发现。已有环境变量会优先于就近文件；如仍指向旧配置，应修正它。临时改用另一份配置或端口可执行：
+
+```powershell
+mikit start --alias "F:\NDW\mikit.alias.json" --port 8084
+```
+
+使用 alias 时，其 `root` 字段优先于 `--root`；`--root` 不会覆盖 JSON 中已有的根目录。需要自定义域名时，使用已配置解析的实际域名执行 `mikit start --domain <实际基础域名>`；当前版本仅修改 JSON 的 `domain` 不会覆盖 CLI 默认域名。
+
+#### 启动排查
+
+- 没有 `Alias config:` 或提示配置不存在：核对当前进程环境变量、文件完整路径和 JSON 语法。双引号包裹键和字符串，不写注释或尾逗号；Windows 路径优先使用 `/`，使用反斜杠时必须写成 `\\`。
+- 提示 `No project loaded` 或目标目录不存在：检查绝对路径 `root`、`projects` 的相对路径和 `auto` 的目录层数；先核对磁盘上的真实目录。
+- 端口被占用：停止自己先前启动的服务，或通过 `--port` 临时使用其他可用端口；修改 JSON 的 `port` 后需重启服务。
+- localhost 能访问但子域名打不开：确认 DNS/hosts 将所用子域名解析到本机，并核对域名与端口。
 
 启动后使用同一个端口访问：
 
@@ -237,7 +288,7 @@ http://worldcup.y.bindyy.cn:8080/index.shtml
 端口优先级：命令行 `--port` 优先，其次使用 alias 配置里的 `port`，最后默认 `8080`。
 
 注意：
-- `projects` 里的路径默认相对 `--root`。
+- `projects` 和 `auto` 中的相对路径以 alias 的 `root` 为基准；未设置该字段时，才使用 `--root` 或当前启动目录。
 - `auto` 支持 `*` 通配一级目录；服务会监听 alias 配置和自动扫描目录变化，新增项目或修改配置后通常不需要重启服务。
 - `/index.shtml` 等普通路径访问映射项目的 `wwwroot`；`/dist/` 访问同项目的 `dist` 目录。
 - `wwwroot` 页面会注入项目级热更新脚本；只有当前项目文件变化时才刷新，不会因为其他子域名项目变化而刷新。
@@ -411,13 +462,18 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 
 依次使用：`browserExecutable` 明确路径、`MIKIT_BROWSER_EXECUTABLE` 环境变量、系统常见 Chrome/Edge 安装位置。`browserExecutable: ""` 表示继续自动查找。
 
-字体字符来自构建后的 HTML/CSS 及可静态确定的 Vue/JS 展示文案、显式补字和已配置页面的实际 DOM，不从未配置的动态状态猜字。成功处理有效字体后，终端会提示报告的完整路径；打开项目 `font/font-report.json`，查看扫描来源、逐字体字符来源计数、输出格式与字节数，以及以下提示：
+字体字符来自构建后的 HTML/CSS 及可静态确定的 Vue/JS 展示文案、显式补字和已配置页面的实际 DOM，不从未配置的动态状态猜字。成功处理有效字体后，终端会提示 Markdown 报告的完整路径。默认打开项目 `font/font-report.md`；若自定义了字符清单目录，以终端提示的路径为准。报告替代原 `font-report.json`，完整字符清单仍保存在 TXT 文件中。
 
-- `fonts[].dynamicBinding` 表示该字体族检测到可见文字的动态绑定；`fonts[].missingDigits` 列出其字符清单尚未收集的 `0–9`，可能为空字符串。未收集不等于源字体缺字，也不能单独证明运行时页面缺字。
-- 仅当有动态绑定且存在未收集数字时，`fonts[].digitSuggestion` 才给出补字建议；否则为 `null`。这只是提示，默认 `asciiBaseline: "none"` 不会据此自动补数字。
-- `fonts[].verification.sourceMissing` 才用于判断源字体无法覆盖的请求字符；顶层 `risks` 用于查看仍无法确定的动态文案。
+建议按以下顺序阅读：
 
-先确认运行时文案是否可能出现提示的数字。若需要补字，在项目 `package.json > mikit.font` 中按 CSS 字体族配置 `"familyExtraText": { "活动标题": "23" }`（示例仅补运行时需要的字符）；也可以显式配置 `"familyOptions": { "活动标题": { "asciiBaseline": "common" } }`，或为需采集的状态补充 `pages`。随后重新执行字体处理，核对报告与实际页面；不要把报告中的未收集数字直接当作已发生的缺字。
+1. **结果概览**：先看处理的字体数、输出文件数、总体积、静态与运行时页面数，以及动态风险、源字体缺字和未执行验证的数量。
+2. **待处理事项**：优先处理“源字体缺字”和“动态文字风险”，再确认“数字覆盖待确认”和“未执行字体验证”。源字体缺字会列出实际字符及 Unicode 码点，需要更换字体或配置回退字体；补字配置无法增加原字体没有的字形。动态风险会标明页面、字体族、表达式或依赖，便于定位未确定的文案。未执行验证不能视为验证通过。
+3. **字体明细**：按字体族核对字符总数、静态采集、运行时新增、配置新增、实际生效的 ASCII 策略和验证结果。点击字符清单查看完整 TXT；逐字体还会展示字符预览、实际输出格式、字体文件、同格式体积及减少比例。原同格式文件不存在时会标注“无法比较”。
+4. **扫描来源与覆盖边界**：核对静态页面和运行时页面列表。未配置 `pages` 时不会执行浏览器 DOM 采集；配置后也只覆盖本次实际采集的 DOM 状态。接口返回、用户输入、异步更新和其他交互状态仍需确认，没有告警不代表全部运行时状态都已覆盖。
+
+“数字覆盖待确认”仅在字体存在动态文字绑定且字符清单仍缺少部分 `0–9` 时提示。尚未采集的数字不等于源字体缺字，也不能单独证明页面已经缺字。默认 `asciiBaseline: "none"` 不会根据提示自动补数字。
+
+先确认运行时文案是否可能出现提示的数字。若需要补字，在项目 `package.json > mikit.font` 中按 CSS 字体族配置 `"familyExtraText": { "活动标题": "23" }`（示例仅补运行时需要的字符）；也可以显式配置 `"familyOptions": { "活动标题": { "asciiBaseline": "common" } }`，或为需采集的状态补充 `pages`。随后重新执行字体处理，核对报告与实际页面。报告、字符清单和字体结果一起发布；字体生成、验证或发布失败时保留上次结果。没有有效字体时不生成报告，并清理过期报告。
 
 ## 核心功能
 

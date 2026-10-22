@@ -27,9 +27,9 @@ function createOutputFixture(t, { files = [], directories = [] } = {}) {
         fs.unlinkSync(filePath);
       }
     });
-    const reportPath = path.join(outputDir, 'manifests', 'font-report.json');
+    const reportPath = path.join(outputDir, 'manifests', 'font-report.md');
     if (fs.existsSync(reportPath)) fs.unlinkSync(reportPath);
-    const projectReportPath = path.join(fixtureRoot, 'font', 'font-report.json');
+    const projectReportPath = path.join(fixtureRoot, 'font', 'font-report.md');
     if (fs.existsSync(projectReportPath)) fs.unlinkSync(projectReportPath);
     directories.forEach((relativePath) => {
       const directoryPath = path.join(outputDir, relativePath);
@@ -38,6 +38,7 @@ function createOutputFixture(t, { files = [], directories = [] } = {}) {
       }
     });
     fs.rmdirSync(outputDir);
+    fs.rmSync(path.join(fixtureRoot, 'wwwroot'), { recursive: true, force: true });
     fs.rmdirSync(fixtureRoot);
   });
   return outputDir;
@@ -573,6 +574,7 @@ test("removes remote-only font files without creating a backup directory", (t) =
   );
   fs.writeFileSync(remoteFontPath, "remote font");
 
+  fs.cpSync(fontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({
     projectDir,
     outputDir: "dist",
@@ -608,6 +610,7 @@ test('removes unreferenced fonts when no local font can be subset', (t) => {
     fs.writeFileSync(path.join(fontDir, fileName), 'source font');
   });
 
+  fs.cpSync(fontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({
     projectDir,
     outputDir: 'dist',
@@ -667,6 +670,7 @@ test('removes every font except referenced fonts with extracted characters', (t)
     fs.writeFileSync(path.join(fontDir, fileName), 'source font');
   });
 
+  fs.cpSync(fontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({
     projectDir,
     outputDir: 'dist',
@@ -738,6 +742,7 @@ test("skips zero-character fonts without creating generated files", (t) => {
   fs.writeFileSync(path.join(fontDir, "unused.woff"), "source font");
   fs.writeFileSync(path.join(fontDir, "unused.woff2"), "source font");
 
+  fs.cpSync(fontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({
     projectDir,
     outputDir: "dist",
@@ -781,6 +786,7 @@ test("removes a stale manifest for a zero-character font", (t) => {
   fs.writeFileSync(fontPath, "source font");
   fs.writeFileSync(staleManifestPath, "旧字符");
 
+  fs.cpSync(fontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({
     projectDir,
     outputDir: "dist",
@@ -826,7 +832,7 @@ test("writes default manifests to the project font directory", (t) => {
   t.after(() => {
     [
       manifestPath,
-      path.join(manifestDir, 'font-report.json'),
+      path.join(manifestDir, 'font-report.md'),
       previousDefaultPath,
       path.join(outputFontDir, "display.ttf"),
       path.join(outputFontDir, "display.woff"),
@@ -845,10 +851,12 @@ test("writes default manifests to the project font directory", (t) => {
       projectDir,
       fixtureRoot,
     ].forEach((directoryPath) => {
+      if (directoryPath === projectDir) fs.rmSync(path.join(projectDir, 'wwwroot'), { recursive: true, force: true });
       if (fs.existsSync(directoryPath)) fs.rmdirSync(directoryPath);
     });
   });
 
+  fs.cpSync(outputFontDir, path.join(projectDir, 'wwwroot', 'font'), { recursive: true });
   subsetFonts({
     projectDir,
     outputDir: "dist",
@@ -899,6 +907,7 @@ test('subsets a font declared in an HTML style block', (t) => {
     '<style>@font-face{font-family:Inline;src:url(font/inline.ttf)}</style>' +
     '<div style="font-family:Inline">字体测试</div>');
   fs.writeFileSync(path.join(dist, 'font', 'inline.ttf'), 'source');
+  fs.cpSync(path.join(dist, 'font'), path.join(root, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({ projectDir: root, outputDir: dist,
     commandRunner(command, args) {
       const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
@@ -922,6 +931,7 @@ test('subsets nested referenced fonts and prunes unused nested files', (t) => {
     '@font-face{font-family:Boat;src:url(../font/boat/regular.ttf)}');
   fs.writeFileSync(path.join(fontDir, 'regular.ttf'), 'source');
   fs.writeFileSync(path.join(fontDir, 'unused.ttf'), 'unused');
+  fs.cpSync(path.join(dist, 'font'), path.join(root, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({ projectDir: root, outputDir: dist,
     commandRunner(command, args) {
       const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
@@ -949,6 +959,7 @@ test('keeps same-named nested fonts and manifests separate', (t) => {
     '@font-face{font-family:Two;src:url(../font/b/common.ttf)}');
   fs.writeFileSync(path.join(dist, 'index.html'),
     '<span style="font-family:One">甲</span><span style="font-family:Two">乙</span>');
+  fs.cpSync(path.join(dist, 'font'), path.join(root, 'wwwroot', 'font'), { recursive: true });
   const result = subsetFonts({ projectDir: root, outputDir: dist,
     commandRunner(command, args) {
       const target = args.find((arg) => arg.startsWith('--output-file=')).slice(14);
@@ -979,6 +990,7 @@ function createFormatFixture(t, cssByPath, fonts) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, `original ${file}`);
   }
+  fs.cpSync(path.join(dist, 'font'), path.join(root, 'wwwroot', 'font'), { recursive: true });
   const calls = [];
   const run = () => subsetFonts({ projectDir: root, outputDir: dist,
     commandRunner(command, args) {
@@ -1023,12 +1035,13 @@ test('subsets a WOFF-only font from its original WOFF without generating other f
   assert.equal(fs.existsSync(path.join(fontDir, 'boat.woff2')), false);
 });
 
-test('fails with the missing WOFF path before pruning any fonts', (t) => {
+test('fails with the missing original font path before pruning any fonts', (t) => {
   const fixture = createFormatFixture(t, {
     'site.css': '@font-face{font-family:Boat;src:url(font/boat.woff)}',
   }, ['boat.ttf', 'other.ttf']);
+  fs.unlinkSync(path.join(fixture.root, 'wwwroot', 'font', 'boat.ttf'));
   assert.throws(fixture.run, (error) =>
-    error.message.includes(path.join(fixture.dist, 'font', 'boat.woff')));
+    error.message.includes(path.join(fixture.root, 'wwwroot', 'font', 'boat.ttf')));
   assert.equal(fixture.calls.length, 0);
   assert.equal(fs.readFileSync(path.join(fixture.dist, 'font', 'other.ttf'), 'utf8'), 'original other.ttf');
   assert.equal(fs.readFileSync(path.join(fixture.dist, 'font', 'boat.ttf'), 'utf8'), 'original boat.ttf');
@@ -1057,7 +1070,7 @@ test('keeps a WOFF input when pyftsubset cannot read it and reports its path', (
       fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'partial');
       return { status: 1 };
     },
-  }), (error) => error.message.includes(source));
+  }), (error) => error.message.includes(path.join(fixture.root, 'wwwroot', 'font', 'boat.woff')));
   assert.equal(fs.readFileSync(source, 'utf8'), 'original boat.woff');
   assert.equal(fs.existsSync(path.join(fixture.dist, 'font', 'boat-subset.woff')), false);
 });

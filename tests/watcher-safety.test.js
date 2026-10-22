@@ -12,6 +12,13 @@ const activityRoot = path.join(watchRoot, '0813 拉新召回');
 const projectRoot = path.join(activityRoot, 'lxzh99');
 const wwwroot = path.join(projectRoot, 'wwwroot');
 const ignored = createAutoWatchIgnored(watchRoot);
+const discoveryIgnored = createAutoWatchIgnored(watchRoot, [['*', '*', 'wwwroot']]);
+const directoryStat = { isDirectory: () => true };
+assert.equal(discoveryIgnored(wwwroot, directoryStat), false);
+assert.equal(discoveryIgnored(path.join(wwwroot, 'css'), directoryStat), true);
+assert.equal(discoveryIgnored(path.join(projectRoot, 'other'), directoryStat), true);
+assert.equal(discoveryIgnored(path.join(activityRoot, 'notes.txt'), { isDirectory: () => false }), true);
+assert.equal(discoveryIgnored(path.join(projectRoot, 'dist'), directoryStat), true);
 
 assert.equal(ignored(watchRoot), false);
 assert.equal(ignored(activityRoot), false);

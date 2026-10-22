@@ -74,7 +74,14 @@ For runtime page collection:
 - Verify Chrome or Edge is installed, or provide a valid `browserExecutable`.
 - A main page HTTP error fails collection; unrelated non-font resource errors may be ignored, while font resource HTTP failures are reported.
 
-After a successful font operation, follow the printed full path to `font/font-report.json`. A font's `dynamicBinding` and `missingDigits` (uncollected digits) may trigger `digitSuggestion`, but do not alone establish actual missing glyphs; `verification.sourceMissing` identifies source-font coverage gaps and top-level `risks` unresolved dynamic content. Confirm which runtime digits or states can occur before configuring explicit `pages`, per-family `familyExtraText`, or opting in to `familyOptions.<family>.asciiBaseline: "common"`. Default `asciiBaseline: "none"` never auto-adds digits. Rerun and check report and actual pages. Then verify only the TTF, WOFF, or WOFF2 files actually referenced for each font in built CSS, including CSS under `scss/` or other output folders. For WOFF-only references, ensure the original WOFF exists before running the command.
+After a successful font operation, follow the printed full path to the Markdown report (`font/font-report.md` by default, or the configured manifest directory). Read it in this order:
+
+1. Check “结果概览” and “待处理事项”. “源字体缺字” lists requested characters absent from the original font, including Unicode code points; replace the font or configure a fallback because adding text cannot create missing glyphs. “动态文字风险” identifies unresolved copy by page, family, and expression or dependency. “未执行字体验证” means coverage is unknown, not passed.
+2. If “数字覆盖待确认” appears, confirm which runtime digits or states can occur. These are uncollected digits, not proof of actual missing glyphs. Configure explicit `pages`, per-family `familyExtraText`, or opt in to `familyOptions.<family>.asciiBaseline: "common"` as appropriate. Default `asciiBaseline: "none"` never auto-adds digits. Rerun and check the report and actual pages.
+3. Use “字体明细” to check character-source counts, the effective ASCII policy, verification, and linked TXT character lists and font files. Compare sizes only against an existing original of the same format; otherwise the report marks them as not comparable.
+4. Check “扫描来源与覆盖边界”. Without `pages`, no browser DOM collection ran; configured pages cover only observed DOM states. Confirm API responses, user input, asynchronous updates, and uncollected interaction states separately.
+
+Then verify only the TTF, WOFF, or WOFF2 files actually referenced for each font in built CSS, including CSS under `scss/` or other output folders. For WOFF-only references, ensure the original WOFF exists before running the command. A failed operation preserves the previous fonts, character lists, and report. If no effective fonts remain, no new report is generated and stale reports are removed.
 
 ## PNG Problems
 

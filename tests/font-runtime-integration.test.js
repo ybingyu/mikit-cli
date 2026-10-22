@@ -36,7 +36,7 @@ function cleanupFixture(fixture) {
   removeFile(path.join(fixture.backupDir, "display.ttf"));
   removeFile(path.join(fixture.backupDir, "remote.ttf"));
   removeFile(path.join(fixture.manifestDir, "display.txt"));
-  removeFile(path.join(fixture.manifestDir, "font-report.json"));
+  removeFile(path.join(fixture.manifestDir, "font-report.md"));
   removeFile(path.join(fixture.cssDir, "app.css"));
   removeFile(path.join(fixture.outputDir, "index.html"));
   removeFile(path.join(fixture.root, "package.json"));
@@ -45,6 +45,7 @@ function cleanupFixture(fixture) {
   removeDirectory(fixture.fontDir);
   removeDirectory(fixture.cssDir);
   removeDirectory(fixture.outputDir);
+  fs.rmSync(path.join(fixture.root, 'wwwroot'), { recursive: true, force: true });
   removeDirectory(fixture.root);
 }
 
@@ -100,6 +101,7 @@ function createFixture(t, { pages, includeRemote = false } = {}) {
     "utf8",
   );
 
+  fs.cpSync(fontDir, path.join(root, 'wwwroot', 'font'), { recursive: true });
   t.after(() => cleanupFixture(fixture));
   return fixture;
 }
