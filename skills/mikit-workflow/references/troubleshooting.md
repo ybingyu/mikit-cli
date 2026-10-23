@@ -44,6 +44,17 @@ If backslashes are used, escape each one:
 
 Use literal-path-aware PowerShell commands when inspecting paths containing Chinese characters, spaces, brackets, or wildcard characters.
 
+## Hot Reload and Idle Watchers
+
+- Open an existing source HTML/SHTML page before testing an edit. An inactive watcher before any page visit is expected; routing remains available. Asset requests and directory listings without an index do not activate it.
+- Check the injected `id="mikit-hot-reload"` script and successful `/hot-update-status?project=...` requests under the current hostname. The query must match the routed project ID. Other computers and phones activate and renew watchers the same way as local browsers.
+- `/dist` redirects to `/dist/`; both use build preview without hot reload or source-watcher registration/renewal. Do not diagnose the absence of automatic refresh there as a failure.
+- Different source directories must stay isolated. Aliases sharing one resolved source directory intentionally share its watcher and updates.
+- Closing one tab does not immediately release the watcher. All pages and devices using that source directory must stop heartbeats; release occurs about 5-5.5 minutes after the last heartbeat. Background tabs may keep polling.
+- After suspension or network loss, let the returning page complete a status request. It reactivates the watcher and fully refreshes when the watcher session changed, including edits made while inactive.
+- Do not infer leaked watchers solely from process memory failing to drop immediately. The server and automatic directory discovery retain baseline resources; garbage collection and memory reuse have no guaranteed release time.
+- When a server run is authorized, verify source activation, project isolation, and the absence of dist registration with temporary fixtures; close all test services afterwards. Do not restart an existing service or leave a persistent server running without authorization.
+
 ## Build or Output Problems
 
 - If `MIKIT_ALIAS_CONFIG` was just saved as a Windows user environment variable, an already-running IDE may not expose it through `process.env`. Mikit can still use the nearest `mikit.alias.json` found by walking upward from the current project/root; explicit `--alias` remains available for `start` and `serve`.

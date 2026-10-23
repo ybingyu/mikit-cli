@@ -197,6 +197,7 @@ test('extracts normal and hidden text while excluding non-content elements', () 
     globalThis.NodeFilter = { SHOW_TEXT: 4 };
     globalThis.document = {
       body,
+      fonts: [{ family: 'Display', weight: '500', style: 'italic' }],
       createTreeWalker(root, whatToShow) {
         walkerArguments.push({ root, whatToShow });
         let index = 0;
@@ -211,11 +212,13 @@ test('extracts normal and hidden text while excluding non-content elements', () 
     };
     globalThis.getComputedStyle = (parent) => ({
       fontFamily: parent.fontFamily,
+      fontWeight: '500',
+      fontStyle: 'italic',
     });
 
     assert.deepEqual(extractTextRecords(), [
-      { text: '普通 文字', fontFamily: '"Display", Arial' },
-      { text: '隐藏 状态', fontFamily: 'Hidden' },
+      { text: '普通 文字', fontFamily: '"Display", Arial', fontWeight: '500', fontStyle: 'italic', availableFaces: [{ family: 'Display', weight: '500', style: 'italic' }] },
+      { text: '隐藏 状态', fontFamily: 'Hidden', fontWeight: '500', fontStyle: 'italic', availableFaces: [{ family: 'Display', weight: '500', style: 'italic' }] },
     ]);
     assert.deepEqual(walkerArguments, [{ root: body, whatToShow: 4 }]);
   } finally {
@@ -702,4 +705,42 @@ test('rejects the whole collection when the second URL fails without returning p
     harness.calls.goto.map((call) => call.pageUrl),
     [PAGE_ONE, PAGE_TWO],
   );
+});
+
+test('runtime collection separates same-family weights and styles across pages', async () => {
+  const harness = createBrowserHarness({ recordsByUrl: {
+    [PAGE_ONE]: [{ text: '常', fontFamily: 'Shared', fontWeight: '400', fontStyle: 'normal' },
+      { text: '粗', fontFamily: 'Shared', fontWeight: '700', fontStyle: 'normal' }],
+    [PAGE_TWO]: [{ text: '斜', fontFamily: 'shared', fontWeight: '400', fontStyle: 'italic' }],
+  } });
+  const result = await collectRuntimeFontCharacters({
+    pages: [PAGE_ONE, PAGE_TWO], wait: 0, timeout: 5000, browserExecutable: 'browser', fontFamilies: ['Shared'],
+    fontFaces: [
+      { key: 'regular', family: 'Shared', weight: '400', style: 'normal' },
+      { key: 'bold', family: 'Shared', weight: '700', style: 'normal' },
+      { key: 'italic', family: 'Shared', weight: '400', style: 'italic' },
+      { key: 'unused', family: 'Shared', weight: '100', style: 'normal' },
+    ],
+  }, { chromium: harness.chromium });
+  assert.equal(result['\u0000face:regular'], '常');
+  assert.equal(result['\u0000face:bold'], '粗');
+  assert.equal(result['\u0000face:italic'], '斜');
+  assert.equal(result['\u0000face:unused'], '');
+  assert.equal(harness.calls.close, 1);
+});
+
+test('runtime fallback considers only faces available in the current page', async () => {
+  const harness = createBrowserHarness({ recordsByUrl: { [PAGE_ONE]: [
+    { text: '退', fontFamily: 'Shared', fontWeight: '700', fontStyle: 'normal',
+      availableFaces: [{ family: 'Shared', weight: '400', style: 'normal' }] },
+  ] } });
+  const result = await collectRuntimeFontCharacters({
+    pages: [PAGE_ONE], wait: 0, timeout: 5000, browserExecutable: 'browser', fontFamilies: ['Shared'],
+    fontFaces: [
+      { key: 'regular', family: 'Shared', weight: '400', style: 'normal' },
+      { key: 'bold', family: 'Shared', weight: '700', style: 'normal' },
+    ],
+  }, { chromium: harness.chromium });
+  assert.equal(result['\u0000face:regular'], '退');
+  assert.equal(result['\u0000face:bold'], '');
 });

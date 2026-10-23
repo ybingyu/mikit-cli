@@ -104,6 +104,14 @@ mikit start --alias "F:/NDW/mikit.alias.json" --port 8084
 
 For ordinary serving without alias configuration, `--root` selects one project or a parent containing projects, `--domain` selects the base domain, and `--virtual` adds URL-to-directory mappings. A root containing `wwwroot` serves that project. Alias mappings take precedence when a config is loaded. `/dist/` exposes the same project's build output without source-page hot reload.
 
+### On-demand hot reload and resource use
+
+`mikit start` activates source watchers on demand when pages are visited. Project routes remain accessible while their source watchers are inactive. Visiting an existing source `.html` or `.shtml` page, including a directory with `index.html` or `index.shtml`, activates its `wwwroot` watcher. Local browsers, remote computers, and phones behave the same way. Aliases resolving to the same source directory share one watcher, as do multiple pages and devices. Different source roots receive separate updates.
+
+Injected pages poll `/hot-update-status?project=...` every second and renew activity. After the last heartbeat, five idle minutes releases the source watcher; the sweep runs every 30 seconds, so release normally occurs after about 5-5.5 minutes. Browser closure is not immediate deregistration. Background tabs may continue polling, while suspended or offline pages can expire; any remaining page heartbeat keeps the shared watcher active. Returning pages reactivate it and fully reload when its session changes to pick up missed edits; visibility restoration and `pageshow` also trigger a status check.
+
+`/dist` redirects to `/dist/`. Build previews do not inject hot reload, activate source watchers, or renew their activity. Standalone asset requests, directory listings without an index, and nonexistent pages do not activate them either. Automatic project discovery retains directory-only watches at the depths required by scan patterns so added or removed projects remain discoverable. The server still has baseline memory use; closing a source watcher releases its resources, but garbage collection and allocator behavior mean process memory need not immediately drop and no fixed drop time is guaranteed.
+
 ### Onboarding and troubleshooting
 
 After AI-assisted CLI/Skill installation or first project onboarding, inspect the intended workspace and both current-process and persistent `MIKIT_ALIAS_CONFIG` values. Report the actual file and all fields above. Ask for missing root, port, domain, author if required, scan patterns, and manual mappings; do not invent them. Setting environment variables requires authorization, but do not ask again when that action was already approved. Explain the two startup modes and provide the configuration tutorial even when installation itself succeeded.

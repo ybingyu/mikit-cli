@@ -166,3 +166,34 @@ test('font CLI refuses to reuse dist subsets when the original font is missing',
   assert.equal(fs.readFileSync(path.join(fontDir, 'title.ttf'), 'utf8'), 'existing subset');
   assert.equal(fs.readFileSync(path.join(root, 'font', 'title.txt'), 'utf8'), 'old manifest');
 });
+
+test('font CLI validates distinct real subsets for same-family weights and cleans the unused face', (t) => {
+  const sources = { regular: 'arial.ttf', bold: 'arialbd.ttf', italic: 'ariali.ttf', unused: 'arial.ttf' };
+  if (Object.values(sources).some((name) => !fs.existsSync(path.join('C:/Windows/Fonts', name)))) {
+    t.skip('Arial fixtures unavailable'); return;
+  }
+  if (spawnSync('pyftsubset', ['--help'], { windowsHide: true }).error) { t.skip('pyftsubset unavailable'); return; }
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-weight-cli-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'wwwroot/font'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'dist/font'), { recursive: true });
+  const weights = { regular: 400, bold: 700, italic: 400, unused: 100 };
+  const css = Object.entries(sources).map(([name, source]) => {
+    fs.copyFileSync(path.join('C:/Windows/Fonts', source), path.join(root, 'wwwroot/font', name + '.ttf'));
+    for (const extension of ['ttf', 'woff', 'woff2']) fs.writeFileSync(path.join(root, 'dist/font', name + '.' + extension), 'stale');
+    return `@font-face{font-family:Shared;font-weight:${weights[name]};font-style:${name === 'italic' ? 'italic' : 'normal'};src:url(font/${name}.ttf),url(font/${name}.woff),url(font/${name}.woff2)}`;
+  }).join('');
+  fs.writeFileSync(path.join(root, 'dist/style.css'), css + '.text{font-family:Shared}');
+  fs.writeFileSync(path.join(root, 'dist/index.html'), '<div class="text">AB<strong>CD</strong><i>EF</i></div>');
+  const result = spawnSync(process.execPath, [cliPath, 'font'], { cwd: root, encoding: 'utf8', windowsHide: true });
+  assert.equal(result.status, 0, result.stderr);
+  for (const [name, characters] of Object.entries({ regular: 'AB', bold: 'CD', italic: 'EF' })) {
+    assert.equal(fs.readFileSync(path.join(root, 'font', name + '.txt'), 'utf8'), characters);
+    for (const extension of ['ttf', 'woff', 'woff2']) assert.ok(fs.statSync(path.join(root, 'dist/font', name + '.' + extension)).size > 0);
+  }
+  assert.equal(fs.existsSync(path.join(root, 'font/unused.txt')), false);
+  assert.equal(fs.readdirSync(path.join(root, 'dist/font')).length, 9);
+  assert.match(fs.readFileSync(path.join(root, 'font/font-report.md'), 'utf8'), /字体文件验证通过/);
+  for (const [name, source] of Object.entries(sources)) assert.deepEqual(
+    fs.readFileSync(path.join(root, 'wwwroot/font', name + '.ttf')), fs.readFileSync(path.join('C:/Windows/Fonts', source)));
+});

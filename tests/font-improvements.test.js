@@ -447,3 +447,6 @@ test('rejects output or manifest paths overlapping original fonts without changi
     assert.equal(fs.readFileSync(path.join(sourceFontDir, 'a.ttf'), 'utf8'), 'original-a');
   }
 });
+
+// Regression coverage for per-weight/style font subsetting.
+require('./font-faces.test');

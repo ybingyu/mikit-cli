@@ -1,13 +1,20 @@
 {
   "name": "mikit-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Npm-based alternative to MiKit desktop app",
   "bin": {
     "mikit": "bin/mikit.js"
   },
+  "files": [
+    "bin",
+    "lib",
+    "mikit.alias.example.json",
+    "skills/mikit-workflow"
+  ],
   "main": "bin/mikit.js",
   "scripts": {
-    "test": "node tests/font-subsetter.test.js && node tests/font-improvements.test.js && node tests/font-report.test.js && node tests/font-static-analysis.test.js && node tests/font-vue-mixins.test.js && node tests/font-runtime-config.test.js && node tests/font-runtime-collector.test.js && node tests/font-runtime-runner.test.js && node tests/font-runtime-integration.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/sass-compiler.test.js && node tests/directory-listing.test.js && node tests/hot-reload-manager.test.js && node tests/hot-reload.test.js && node tests/svn-css-sync.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/build-author-header.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js && node tests/watcher-safety.test.js"
+    "test": "node tests/font-subsetter.test.js && node tests/font-improvements.test.js && node tests/font-report.test.js && node tests/font-static-analysis.test.js && node tests/font-vue-mixins.test.js && node tests/font-runtime-config.test.js && node tests/font-runtime-collector.test.js && node tests/font-runtime-runner.test.js && node tests/font-runtime-integration.test.js && node tests/font-cli.test.js && node tests/ssi-root.test.js && node tests/sass-compiler.test.js && node tests/directory-listing.test.js && node tests/hot-reload-manager.test.js && node tests/hot-reload.test.js && node tests/svn-css-sync.test.js && node tests/build-workflow.test.js && node tests/build-workflow-cli.test.js && node tests/build-author-header.test.js && node tests/project-init.test.js && node tests/png-optimizer.test.js && node tests/png-build-cli.test.js && node tests/watcher-safety.test.js",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "mikit",
@@ -18,6 +25,18 @@
   ],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ybingyu/mikit-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ybingyu/mikit-cli/issues"
+  },
+  "homepage": "https://github.com/ybingyu/mikit-cli#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dependencies": {
     "@napi-rs/image": "^1.15.0",
     "acorn": "^8.18.0",

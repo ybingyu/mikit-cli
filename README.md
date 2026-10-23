@@ -8,15 +8,35 @@ Mikit-CLI 是一个基于 Node.js 的静态网站构建工具，替代传统的 
 
 ### 安装 Mikit-CLI
 
-下面三种方式按使用场景选择一种，不需要重复安装。
+下面三种方式按使用场景选择一种，不需要重复安装。普通用户推荐从 npm 官方仓库全局安装。
 
-**方式一：从 npm 全局安装发布版本**
+**方式一（推荐）：从 npm 官方仓库全局安装**
 
 ```bash
 npm install -g mikit-cli
+mikit --version
+mikit --help
 ```
 
-**方式二：在 Windows 上把本地源码目录安装为全局命令**
+更新全局安装的版本：
+
+```bash
+npm install -g mikit-cli@latest
+mikit --version
+mikit --help
+```
+
+**方式二：作为项目开发依赖安装**
+
+```bash
+npm install -D mikit-cli
+npx mikit --version
+npx mikit --help
+```
+
+项目依赖通常通过 npm scripts 调用，例如 `npm run build`；也可以直接使用 `npx mikit`。需要更新到最新版时，执行 `npm install -D mikit-cli@latest`。
+
+**方式三：在 Windows 上把本地源码目录安装为全局命令（仅开发和调试）**
 
 新克隆的源码必须先安装项目依赖，再建立全局命令链接：
 
@@ -24,18 +44,11 @@ npm install -g mikit-cli
 Set-Location "F:\mikit-cli"
 npm ci
 npm install -g "file:F:\mikit-cli"
+mikit --version
 mikit --help
 ```
 
-`npm ci` 会严格按照 `package-lock.json` 把运行依赖安装到源码目录的 `node_modules`。`npm install -g "file:..."` 适合开发或调试，它建立的是指向源码目录的全局链接，不会代替源码目录安装依赖；如果跳过 `npm ci`，运行时可能出现 `Cannot find module 'commander'`。源码修改后，全局 `mikit` 会继续指向该本地目录。
-
-**方式三：作为项目开发依赖安装**
-
-```bash
-npm install --save-dev mikit-cli
-```
-
-本地依赖通常通过项目的 npm scripts 调用，例如 `npm run build`；也可以使用 `npx mikit --help`。
+`npm ci` 会严格按照 `package-lock.json` 把运行依赖安装到源码目录的 `node_modules`。`npm install -g "file:..."` 仅适合 Mikit-CLI 本身的开发或调试，它建立的是指向源码目录的全局链接，不会代替源码目录安装依赖；如果跳过 `npm ci`，运行时可能出现 `Cannot find module 'commander'`。源码修改后，全局 `mikit` 会继续指向该本地目录。
 
 ### 字体子集化依赖（仅字体功能需要）
 
@@ -219,55 +232,37 @@ lxzh.y.bindyy.cn
 | `root` | `"F:/NDW"` | 项目统一根目录。想从任意目录启动时请填写绝对路径；auto 和 projects 的相对路径以此为基准。未设置时使用 --root，未传 --root 时使用启动目录。相对 root 按启动目录解析，不按 JSON 所在目录解析。 |
 | `port` | `8080` | 端口使用数字，例如 8080 或 8084。优先级：命令行 --port > JSON 的 port > 8080。 |
 | `domain` | `"y.bindyy.cn"` | 子域名的基础域名，不含协议、端口或项目名前缀。当前 CLI 默认传入 y.bindyy.cn，仅修改 JSON 不会切换域名；自定义域名需显式传 --domain，并配置 DNS 或 hosts。 |
-| `default` | `"wjms"` | 默认项目的别名，必须是实际加载成功的别名。访问 localhost 或未匹配的主机名时使用它；省略时使用第一个加载的项目。 |
+| `default` | `"wjms"` | 可选。用于指定默认项目的别名。访问 `localhost` 或未匹配的主机名时使用该项目；省略时使用第一个成功加载的项目。配置的别名未加载成功时会显示警告，并回退到第一个项目。 |
 | `auto` | `["【魔域】/2026/*/*/wwwroot"]` | 可选的自动扫描规则，建议使用数组；也支持单个字符串。整段 * 只匹配一级目录，不支持 ** 或部分目录名通配。以 wwwroot 结尾，使用其父目录名生成别名。无需扫描时写 []。 |
 | `projects` | `{"wjms": "【魔域】/2026/0518 拉新召回/lxzh/wwwroot"}` | 手动别名映射，可指向项目目录或 wwwroot，也可使用绝对路径。别名建议用小写英文字母、数字及中间的连字符；手动配置覆盖同名自动别名。仅自动扫描时写 {}。 |
 | `author` | `"全局作者(工号)"` | 可选的全局构建作者，与启动服务无关。项目作者存在时用作 Editor；项目作者为空时用作 Author。不需要时省略或写空字符串。 |
 
 以上路径、作者和项目名均为示例，请按实际目录填写；已有配置只补齐需要的字段，不要覆盖原有映射。这些字段放在独立的 `mikit.alias.json` 顶层，不放进 `package.json > mikit`；`mikit init` 不会创建这个文件。即使不配置手动别名，也建议保留 `"projects": {}`。
 
-#### 配置一次，以后只运行 mikit start
-
-适用于已安装全局 `mikit`、希望从 `C:\Users\ND` 等任意目录启动统一项目服务的情况。上面的 JSON 已设置绝对路径 `root`、`port` 和默认域名，下面只需告诉 Mikit 去哪里读取它。
-
-**1. 保存并检查配置，设置环境变量。** 在 PowerShell 中执行，示例路径需替换成实际路径：
+保存上面的 `mikit.alias.json` 后，只需把文件路径保存为当前 Windows 用户环境变量。以下命令只需执行一次，示例路径需替换为实际路径：
 
 ```powershell
-# 示例路径；先替换成你实际保存的配置文件路径
-$aliasPath = 'F:\NDW\mikit.alias.json'
-Test-Path -LiteralPath $aliasPath -PathType Leaf
-Get-Content -LiteralPath $aliasPath -Raw | ConvertFrom-Json
-
-# 确认文件存在且 JSON 可解析后，保存到当前 Windows 用户
-[Environment]::SetEnvironmentVariable('MIKIT_ALIAS_CONFIG', $aliasPath, 'User')
-
-# 让当前 PowerShell 窗口立即生效
-$env:MIKIT_ALIAS_CONFIG = $aliasPath
+[Environment]::SetEnvironmentVariable(
+  'MIKIT_ALIAS_CONFIG',
+  'F:\NDW\mikit.alias.json',
+  'User'
+)
 ```
 
-`Test-Path` 应返回 `True`，JSON 解析不应报错。`MIKIT_ALIAS_CONFIG` 的值是 JSON 文件的完整路径，不是项目目录；它也是全局作者配置的读取入口，不只用于作者注释。
-
-保存用户环境变量不会更新已打开的终端或 IDE。上面的 `$env:` 赋值只影响当前 PowerShell 及其子进程；后续新进程会在读取到更新后的用户环境时生效。如果从旧 IDE 或终端程序新开的窗口仍读不到变量，请完全退出并重新打开该程序，或在当前窗口执行 `$env:` 赋值。
-
-**2. 核对后直接启动。**
+重新打开 PowerShell，以后从任意目录直接运行：
 
 ```powershell
-$env:MIKIT_ALIAS_CONFIG
-[Environment]::GetEnvironmentVariable('MIKIT_ALIAS_CONFIG', 'User')
 mikit start
 ```
 
-前两行分别显示当前进程和用户持久保存的值，应指向同一份配置。启动后核对 `Alias config:` 是否为该文件、`Loaded projects:` 是否包含预期别名，以及访问地址的端口是否正确；不要仅凭 `Project root:` 判断 alias 的根目录，它可能仍显示启动目录。完成后按 Ctrl+C 停止服务。
+首次启动时确认 `Alias config:` 指向正确的配置文件，且 `Loaded projects:` 包含预期别名即可。
 
-**3. 只在项目根目录或其子目录启动时，可以不设环境变量。** `mikit start`、`mikit serve` 和 `mikit build` 会从当前根目录向上查找最近的 `mikit.alias.json`。例如在 `F:\NDW` 或其子目录启动时可以找到该文件；在 `C:\Users\ND` 启动不会自动搜索到另一个盘的 `F:\NDW`。JSON 仍建议保留绝对路径 `root`，避免从子目录启动时项目相对路径改变。
-
-配置文件选择优先级：显式 `--alias`（支持该选项的命令）> `MIKIT_ALIAS_CONFIG` > 向上自动发现。已有环境变量会优先于就近文件；如仍指向旧配置，应修正它。临时改用另一份配置或端口可执行：
+如果不想重新打开当前 PowerShell，可以先让环境变量在当前窗口立即生效：
 
 ```powershell
-mikit start --alias "F:\NDW\mikit.alias.json" --port 8084
+$env:MIKIT_ALIAS_CONFIG = 'F:\NDW\mikit.alias.json'
+mikit start
 ```
-
-使用 alias 时，其 `root` 字段优先于 `--root`；`--root` 不会覆盖 JSON 中已有的根目录。需要自定义域名时，使用已配置解析的实际域名执行 `mikit start --domain <实际基础域名>`；当前版本仅修改 JSON 的 `domain` 不会覆盖 CLI 默认域名。
 
 #### 启动排查
 
@@ -291,8 +286,8 @@ http://worldcup.y.bindyy.cn:8080/index.shtml
 - `projects` 和 `auto` 中的相对路径以 alias 的 `root` 为基准；未设置该字段时，才使用 `--root` 或当前启动目录。
 - `auto` 支持 `*` 通配一级目录；服务会监听 alias 配置和自动扫描目录变化，新增项目或修改配置后通常不需要重启服务。
 - `/index.shtml` 等普通路径访问映射项目的 `wwwroot`；`/dist/` 访问同项目的 `dist` 目录。
-- `wwwroot` 页面会注入项目级热更新脚本；只有当前项目文件变化时才刷新，不会因为其他子域名项目变化而刷新。
-- `/dist/` 只做构建产物预览，不注入热更新脚本。
+- 访问 `wwwroot` 开发页面后会按需开启源码监听并注入热更新脚本；不同源码目录的更新互不影响，指向同一源码目录的别名共用监听和更新。详见“热更新”一节的空闲释放说明。
+- `/dist` 会跳转到 `/dist/`，只做构建产物预览，不注入热更新脚本，也不登记或续期源码监听。
 - JSON 路径建议使用 `/`，不要写成 `\`，避免 `\2026`、`\0518` 被当作 JSON 转义字符。
 - JSON 最后一项不能有尾逗号。
 - 子域名需要能解析到本机，例如通过通配 DNS 或 hosts 配置到 `127.0.0.1`。
@@ -488,9 +483,14 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 - 支持嵌套导入和变量
 
 ### 3. 热更新
-- 开发页面会注入项目级轮询脚本，每秒查询当前项目的更新状态。
+- `mikit start` 根据页面访问按需开启源码监听。服务启动后，各项目地址可以正常访问；访问实际存在的 HTML/SHTML 开发页面，或带 `index.html` / `index.shtml` 的目录时，会开启对应 `wwwroot` 的监听。本机、其他电脑和手机访问的行为相同。
+- 开发页面会注入项目级轮询脚本，每秒查询当前项目的更新状态并续期监听。同一个源码目录的多个别名、页面和设备共用一份监听。
 - CSS 变更优先刷新对应样式表；HTML、JavaScript 等其他文件变更时刷新页面。
-- 多项目共用端口时，变更只通知所属项目，不会刷新其他子域名。
+- 不同源码目录之间的更新相互隔离；多个别名指向同一源码目录时，这些页面会一起收到更新。
+- 所有页面停止心跳后，空闲满 5 分钟释放源码监听，每 30 秒检查一次，通常约 5～5.5 分钟完成。关闭浏览器不会立即释放；只要仍有页面或设备发送心跳，就继续保留监听。后台标签页可能继续轮询，也可能被浏览器暂停。
+- 页面从休眠或断网中恢复后会重新登记；如果监听已释放并重新创建，页面会自动整页刷新，补上未监听期间的变化。回到可见状态时也会检查更新。
+- `/dist` 会跳转到 `/dist/`；构建预览不注入热更新、不登记也不续期源码监听。单独请求图片、CSS、JavaScript、无首页的目录列表或不存在的页面也不会登记。
+- 自动发现项目仍会监听扫描规则所需的目录层级，用于识别新增、删除的项目，不会因此递归监听所有项目的源码内容。服务本身仍有基础内存占用；释放源码监听可减少资源占用，但 Node.js 垃圾回收和操作系统不保证进程内存立即下降，也没有固定下降时间。
 
 ### 4. 构建优化
 - 可选压缩 HTML、CSS、JavaScript。
@@ -804,6 +804,8 @@ mikit start --port 8085
 - 页面源码中存在 `id="mikit-hot-reload"` 的脚本。
 - 浏览器能请求当前域名下的 `/hot-update-status?project=...`。
 - 子域名与 alias/自动扫描出的项目 ID 一致，文件确实位于该项目的 `wwwroot`。
+- 启动后未访问源码页面时，没有对应源码监听属于正常行为；先打开实际存在的 HTML/SHTML 页面再修改源码。
+- 若页面长时间休眠或断网，恢复后等待状态请求成功；监听重新创建时应自动整页刷新。关闭页面后需等最后一次心跳后约 5～5.5 分钟才会释放，其他页面持续心跳时不会释放。
 - 终端是否输出了文件变化和热更新通知日志。
 
 ### 3. SCSS 编译错误
