@@ -4,7 +4,7 @@ const program = require('commander');
 
 // 版本信息
 program
-  .version('1.0.0')
+  .version(require('../package.json').version)
   .description('Npm-based alternative to MiKit desktop app');
 
 // 初始化当前项目的 package.json
