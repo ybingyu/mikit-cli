@@ -40,6 +40,20 @@ const { createHotReloadManager } = require('../lib/hot-reload-manager');
     assert.deepEqual(changed.files, ['index.html']);
     assert.equal((await manager.activate('auto')).lastModified, changed.lastModified);
 
+    watchers[0].notify(['style.css']);
+    const css = await manager.activate('auto', changed.lastModified);
+    assert.deepEqual(css.files, ['style.css']);
+    watchers[0].notify(['index.html']);
+    const html = await manager.activate('auto');
+    watchers[0].notify(['style.css']);
+    const batch = await manager.activate('auto', css.lastModified);
+    assert.deepEqual(batch.files, ['index.html', 'style.css']);
+    assert.deepEqual((await manager.activate('alias', html.lastModified)).files, ['style.css']);
+    assert.deepEqual((await manager.activate('auto', css.lastModified)).files, batch.files, 'Client cursors must not consume other clients updates');
+    assert.deepEqual((await manager.activate('auto', batch.lastModified)).files, []);
+    for (let i = 0; i < 110; i += 1) watchers[0].notify(['style.css']);
+    assert.deepEqual((await manager.activate('auto', css.lastModified)).files, [], 'Expired history must request a full reload');
+
     clock += 299999;
     await manager.activate('alias');
     clock += 2;

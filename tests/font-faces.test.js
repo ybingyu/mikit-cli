@@ -138,3 +138,16 @@ test('unresolved whole Vue class conservatively keeps possible font weights and 
   build(root);
   for (const name of ['100-normal', '400-normal', '500-normal', '700-normal', '400-italic']) assert.equal(text(root, name), '待继');
 });
+
+
+test('generated family supplements apply to all weights and styles like manual supplements', (t) => {
+  const root = fixture(t, '<div class="text">静</div>');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ mikit: { font: {
+    familyExtraText: { Shared: '补' }, generatedFamilyExtraText: { Shared: '补123' },
+  } } }));
+  build(root);
+  assert.equal(text(root, '400-normal'), '静补123');
+  for (const name of ['100-normal', '500-normal', '700-normal', '400-italic']) {
+    assert.equal(text(root, name), '补123');
+  }
+});

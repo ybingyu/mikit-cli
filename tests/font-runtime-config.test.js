@@ -45,6 +45,7 @@ test('exports the frozen static default configuration', () => {
     dynamicTextPolicy: 'warn',
     globalExtraText: '',
     familyExtraText: {},
+    generatedFamilyExtraText: {},
     familyOptions: {},
   });
   assert.equal(Object.isFrozen(DEFAULT_FONT_RUNTIME_CONFIG), true);
@@ -137,6 +138,7 @@ test('loads and normalizes configured runtime font pages', () => {
       dynamicTextPolicy: 'warn',
       globalExtraText: '',
       familyExtraText: {},
+      generatedFamilyExtraText: {},
       familyOptions: {},
     });
   } finally {
@@ -271,5 +273,33 @@ test('wraps malformed package.json errors', () => {
     );
   } finally {
     cleanup(dir, ['package.json']);
+  }
+});
+
+
+test('loads generated supplements separately without changing legacy configuration', () => {
+  const dir = createFixture();
+  const font = { familyExtraText: { A: 'abc' }, generatedFamilyExtraText: { A: '123', B: '😀' } };
+  try {
+    writePackageJson(dir, { mikit: { font } });
+    const original = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+    const config = loadFontRuntimeConfig(dir);
+    assert.deepEqual(config.familyExtraText, font.familyExtraText);
+    assert.deepEqual(config.generatedFamilyExtraText, font.generatedFamilyExtraText);
+    assert.equal(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'), original);
+    const legacy = validateFontRuntimeConfig({ familyExtraText: { A: 'abc' } });
+    assert.deepEqual(legacy.familyExtraText, { A: 'abc' });
+    assert.deepEqual(legacy.generatedFamilyExtraText, {});
+    legacy.generatedFamilyExtraText.A = 'isolated';
+    assert.deepEqual(validateFontRuntimeConfig({}).generatedFamilyExtraText, {});
+    assert.equal(Object.isFrozen(DEFAULT_FONT_RUNTIME_CONFIG.generatedFamilyExtraText), true);
+  } finally {
+    cleanup(dir, ['package.json']);
+  }
+});
+
+test('rejects invalid generated supplements with the specific configuration field', () => {
+  for (const value of [null, [], 'abc', 123, { A: 123 }, { A: null }]) {
+    assert.throws(() => validateFontRuntimeConfig({ generatedFamilyExtraText: value }), /generatedFamilyExtraText/);
   }
 });

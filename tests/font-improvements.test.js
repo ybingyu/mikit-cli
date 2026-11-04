@@ -8,7 +8,7 @@ const { subsetFonts, collectFontCharacters } = require('../lib/font-subsetter');
 const { validateFontRuntimeConfig } = require('../lib/font-runtime-config');
 
 function fontDetails(report, family) {
-  return report.split('<summary>采集详情</summary>')[1].split('\n')
+  return report.split('## 采集详情\n')[1].split('\n')
     .find((line) => line.startsWith('| ' + family + ' |'));
 }
 
@@ -120,12 +120,21 @@ test('static JS source from built script adds visible text and leaves unknown bi
   const root = fixture(t);
   fs.writeFileSync(path.join(root, 'dist', 'index.html'), `<div class="a">{{item.name}}{{apiText}}</div><script src="./app.js"></script>`);
   fs.writeFileSync(path.join(root, 'dist', 'app.js'), `new Vue({data(){return {item:{name:'静态文案'}}}})`);
-  const result = subsetFonts({ projectDir: root,
-    commandRunner(_command, args) {
-      fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
-      return { status: 0 };
-    },
-  });
+  const warnings = [];
+  const originalWarn = console.warn;
+  let result;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    result = subsetFonts({ projectDir: root,
+      commandRunner(_command, args) {
+        fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
+        return { status: 0 };
+      },
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.deepEqual(warnings, []);
   assert.match(fs.readFileSync(path.join(root, 'font', 'a.txt'), 'utf8'), /静态文案/);
   assert.match(result.risks.join(','), /apiText/);
   const report = fs.readFileSync(path.join(root, 'font', 'font-report.md'), 'utf8');
@@ -133,7 +142,7 @@ test('static JS source from built script adds visible text and leaves unknown bi
   assert.ok(report.includes('| A | 0123456789 |'));
   assert.match(report, /familyExtraText/);
   assert.match(report, /动态文字风险[\s\S]*apiText/);
-  assert.ok(report.includes('| index.html | A | apiText |'));
+  assert.ok(report.includes('| index.html | div.a | A | apiText |'));
   assert.equal(report.includes(root), false);
   assert.equal(/[0-9]/.test(fs.readFileSync(path.join(root, 'font', 'a.txt'), 'utf8')), false);
 });
@@ -278,7 +287,11 @@ test('reports uncollected digits for a dynamic font family without adding a base
   const report = fs.readFileSync(path.join(root, 'font', 'font-report.md'), 'utf8');
   assert.match(fontDetails(report, 'A'), /\| 是 \|$/);
   assert.ok(report.includes('| A | 03456789 |'));
-  assert.match(report, /familyExtraText.*familyOptions.*common/);
+  const examples = [...report.matchAll(/```json\n([\s\S]*?)\n```/g)]
+    .map((match) => JSON.parse(match[1]));
+  const extra = examples.find((example) => example.mikit.font.familyExtraText);
+  assert.ok(extra, 'dynamic digit configuration example missing');
+  assert.deepEqual(extra.mikit.font.familyExtraText, { A: '03456789' });
   assert.match(fontDetails(report, 'B'), /\| 否 \|$/);
   assert.ok(!report.includes('| B | 0123456789 |'));
   assert.equal(fs.readFileSync(path.join(root, 'font', 'b.txt'), 'utf8'), '乙');
@@ -450,3 +463,356 @@ test('rejects output or manifest paths overlapping original fonts without changi
 
 // Regression coverage for per-weight/style font subsetting.
 require('./font-faces.test');
+
+
+test('report locates unresolved bindings and digit candidates at distinct template elements', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<div id="app" class="a"><span class="count">甲{{counter}}</span>' +
+    '<span class="count">{{counter}}</span><em v-text="apiText"></em>' +
+    '<input :placeholder="counter"><b v-for="n in [1,2]">{{n}}</b></div>' +
+    '<span class="b">乙</span><script>new Vue({data:{counter:12}})</script>');
+  const result = subsetFonts({ projectDir: root, commandRunner(_command, args) {
+    fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
+    return { status: 0 };
+  } });
+  const report = fs.readFileSync(result.report, 'utf8');
+  assert.ok(report.includes('| 页面 | 元素位置 | 字体族 | 表达式 / 依赖 | 待确认问题 |'));
+  assert.match(report, /div&#35;app\.a &gt; em[\s\S]*apiText/);
+  const digits = report.split('### 数字覆盖待确认')[1].split('### 动态字体配置示例')[0];
+  assert.match(digits, /index.html/);
+  assert.match(digits, /div&#35;app\.a &gt; span\.count:nth-of-type\(1\).*counter/);
+  assert.match(digits, /div&#35;app\.a &gt; span\.count:nth-of-type\(2\).*counter/);
+  assert.match(digits, /input.*counter/);
+  assert.equal(digits.split(' &gt; b | n |').length - 1, 1, 'loop instances share a source location');
+  assert.doesNotMatch(digits, /apiText|class="b"/);
+  assert.doesNotMatch(report, /mikit-font-safe-|#root/);
+  assert.deepEqual(new Set(fs.readFileSync(path.join(root, 'font', 'a.txt'), 'utf8')), new Set('甲12'));
+});
+
+test('dynamic injected markup and inherited loop text retain the originating binding location', () => {
+  const dynamicSources = new Map();
+  collectFontCharacters({
+    htmlContents: ['<div class="a"><section v-html="markup"></section><p v-for="n in [1,2]"><b>9</b></p></div><script>new Vue({data:{markup:"<i>12</i>"}})</script>'],
+    htmlPaths: ['index.shtml'], cssFiles: [{ content: '.a{font-family:A}' }],
+    fontFamilies: new Set(['A']), dynamicSources,
+  });
+  const locations = [...dynamicSources.values()];
+  assert.ok(locations.some((source) => source.family === 'A' && source.element === 'div.a > section' && source.expression === 'markup'));
+  assert.ok(locations.some((source) => source.family === 'A' && source.element === 'div.a > p' && source.expression === 'n in [1,2]'));
+});
+
+
+test('wide templates do not repeatedly scan the same sibling arrays for element locations', () => {
+  const count = 4000;
+  const originalFilter = Array.prototype.filter;
+  let scannedEntries = 0;
+  let result;
+  // Count scan work instead of relying on machine-dependent timing thresholds.
+  try {
+    Array.prototype.filter = function (...args) {
+      if (this.length >= count) scannedEntries += this.length;
+      return Reflect.apply(originalFilter, this, args);
+    };
+    result = collectFontCharacters({
+      htmlContents: ['<div class="a">' + '<span>甲</span>'.repeat(count) + '</div>'],
+      cssFiles: [{ content: '.a{font-family:A}' }], fontFamilies: new Set(['A']),
+    });
+  } finally {
+    Array.prototype.filter = originalFilter;
+  }
+  assert.equal(result.A, '甲');
+  assert.ok(scannedEntries <= count * 20,
+    'sibling scan work must stay linear; scanned ' + scannedEntries + ' entries');
+});
+
+test('template traversal stops at its node limit with one warning and continues on the next page', () => {
+  const risks = new Set();
+  const result = collectFontCharacters({
+    htmlContents: [
+      '<div class="a">' + '<span>甲</span>'.repeat(10010) + '<b>{{apiText}}</b>尾</div><p class="a">丙</p>',
+      '<div class="a">乙</div>',
+    ],
+    htmlPaths: ['wide.html', 'next.html'],
+    cssFiles: [{ content: '.a{font-family:A}' }], fontFamilies: new Set(['A']), risks,
+  });
+  assert.equal(risks.size, 1, 'the node limit must produce only one summary warning per page');
+  assert.match([...risks][0], /wide\.html.*模板展开超过节点上限 10000/);
+  assert.equal(result.A, '甲乙', 'text and bindings after the limit must not be collected');
+});
+
+test('cached element positions count tags separately and stay local to each original parent', () => {
+  const dynamicSources = new Map();
+  collectFontCharacters({
+    htmlContents: ['<div class="a"><section><span>{{counter}}</span> text <em>甲</em><span>{{counter}}</span></section>' +
+      '<section><span v-for="n in [1,2]">{{counter}}</span><span>{{counter}}</span></section></div>' +
+      '<script>new Vue({data:{counter:12}})</script>'],
+    cssFiles: [{ content: '.a{font-family:A}' }], fontFamilies: new Set(['A']), dynamicSources,
+  });
+  const locations = [...dynamicSources.values()].filter((source) => source.expression === 'counter')
+    .map((source) => source.element);
+  assert.deepEqual(locations, [
+    'div.a > section:nth-of-type(1) > span:nth-of-type(1)',
+    'div.a > section:nth-of-type(1) > span:nth-of-type(2)',
+    'div.a > section:nth-of-type(2) > span:nth-of-type(1)',
+    'div.a > section:nth-of-type(2) > span:nth-of-type(2)',
+  ]);
+});
+
+
+test('generated supplements can be replaced and removed without deleting manual or collected text', (t) => {
+  const root = fixture(t);
+  const manual = { A: '甲保a😀' };
+  const run = (generated) => subsetFonts({ projectDir: root,
+    runtimeConfig: validateFontRuntimeConfig({ globalExtraText: '全', familyExtraText: manual,
+      ...(generated === undefined ? {} : { generatedFamilyExtraText: generated }) }),
+    commandRunner(_command, args) {
+      fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
+      return { status: 0 };
+    },
+  });
+  const text = (name) => fs.readFileSync(path.join(root, 'font', name + '.txt'), 'utf8');
+  const first = run({ A: 'abc😀', B: '乙Z' });
+  assert.equal(text('a'), '甲全保a😀bc');
+  assert.equal(text('b'), '乙全Z');
+  assert.ok(fs.readFileSync(first.report, 'utf8').includes('| A | 1 | 0 | 6 |'));
+  run({ A: '1723甲😀' });
+  assert.equal(text('a'), '甲全保a😀1723');
+  assert.equal(text('b'), '乙全');
+  run({});
+  const afterRemoval = text('a');
+  assert.equal(afterRemoval, '甲全保a😀');
+  run();
+  assert.equal(text('a'), afterRemoval, 'omitting the new field preserves legacy output');
+  assert.deepEqual(manual, { A: '甲保a😀' });
+  assert.equal(fs.readFileSync(path.join(root, 'wwwroot', 'font', 'a.ttf'), 'utf8'), 'original-a');
+});
+
+test('font report uses actual runtime configuration and omits system-only risks', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<div style="font-family:Microsoft YaHei">{{systemText}}</div>' +
+    '<span class="a">甲{{apiText}}</span><span class="b">乙</span>');
+  const runtimeConfig = validateFontRuntimeConfig({
+    pages: ['https://hdl.example.test/event.shtml?stage=final'],
+    familyExtraText: { A: '前往参赛' }, generatedFamilyExtraText: { A: '倒计时' },
+  });
+  const result = subsetFonts({ projectDir: root, runtimeConfig, runtimeRunner: () => ({}),
+    commandRunner(_command, args) {
+      fs.writeFileSync(args.find((arg) => arg.startsWith('--output-file=')).slice(14), 'subset');
+      return { status: 0 };
+    },
+  });
+  const markdown = fs.readFileSync(result.report, 'utf8');
+  assert.doesNotMatch(markdown, /Microsoft YaHei|systemText|index\.shtml\?o=/);
+  assert.match(markdown, /apiText/);
+  const examples = [...markdown.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => JSON.parse(match[1]).mikit.font);
+  assert.deepEqual(examples.find(config => config.pages).pages, runtimeConfig.pages);
+  const supplements = examples.find(config => config.familyExtraText);
+  assert.ok(supplements.familyExtraText.A.startsWith('前往参赛'));
+  assert.deepEqual(supplements.generatedFamilyExtraText, { A: '倒计时' });
+});
+test('reports query-driven system text and local-font visibility without inventing URLs', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<link rel="stylesheet" href="style.css"><div id="app">' +
+    '<span class="system" v-text="booked ? \'已预约\' : \'立即预约\'"></span>' +
+    '<section v-show="activeDialog === \'rules\'"><b class="a">规则</b></section>' +
+    '<b class="a">{{heat}}</b></div><script src="state.js"></script>');
+  fs.appendFileSync(path.join(root, 'dist', 'style.css'), '.system{font-family:"Microsoft YaHei"}');
+  fs.writeFileSync(path.join(root, 'dist', 'state.js'),
+    'function preview(page){var search=window.location.search;' +
+    'var bookedMatch=search.match(/(?:^|[?&])booked=(0|1)(?:&|$)/);' +
+    'var dialogMatch=search.match(/(?:^|[?&])dialog=(login|rules)(?:&|$)/);' +
+    'var heatMatch=search.match(/(?:^|[?&])heat=(\\d+)(?:&|$)/);' +
+    'if(bookedMatch)page.booked=bookedMatch[1]==="1";' +
+    'if(dialogMatch)page.activeDialog=dialogMatch[1];if(heatMatch)page.heat=Number(heatMatch[1]);}' +
+    'new Vue({data:{booked:false,activeDialog:"",heat:0},mounted(){preview(this)}});');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ mikit: { font: { pages: ['http://example.test/?booked=0'] } } }));
+  const result = subsetFonts({ projectDir: root, runtimeRunner() { return {}; }, commandRunner(_command, args) {
+    fs.writeFileSync(args.find(arg => arg.startsWith('--output-file=')).slice(14), 'subset');
+    return { status: 0 };
+  } });
+  const markdown = fs.readFileSync(result.report, 'utf8');
+  assert.match(markdown, /## 页面状态参数/);
+  const section = markdown.split('## 页面状态参数')[1].split('## 采集详情')[0];
+  assert.match(section, /booked.*0、1.*系统字体.*无需补充字体采集/);
+  assert.match(section, /dialog.*login、rules.*可能影响本地字体.*A/);
+  assert.match(section, /heat.*数字.*范围未确定/);
+  assert.match(section, /已配置取值：0；未显式配置取值：1/);
+  assert.match(section, /activeDialog.*section/);
+  assert.doesNotMatch(section, /http:\/\/example.test\/\?booked=1/);
+});
+
+const { analyzePageStateParameters } = require('../lib/font-state-parameters');
+function analyzeState(content, options = {}) {
+  return analyzePageStateParameters({ scripts: [{ content, filePath: 'js/state.js' }],
+    page: 'index.html', localFamilies: ['A'], ...options });
+}
+
+test('state discovery follows URLSearchParams and URL aliases into template fields', () => {
+  const records = analyzeState(
+    'const params = new URLSearchParams(window.location.search);' +
+    'const booked = params.get("booked"); if(booked === "1") {}' +
+    'const url = new URL(location.href); const mode = url.searchParams.get("mode");' +
+    'if(mode === "rules") {}', {
+      bindings: [{ element: 'span', expression: 'booked', families: ['A'] },
+        { element: 'section', expression: 'mode', families: ['KaiTi'] }],
+      runtimePages: ['https://example.test/?booked=1'],
+    });
+  assert.equal(records.find(item => item.name === 'booked').impact, 'local');
+  assert.deepEqual(records.find(item => item.name === 'booked').values, ['1']);
+  assert.deepEqual(records.find(item => item.name === 'booked').configuredValues, ['1']);
+  assert.equal(records.find(item => item.name === 'mode').impact, 'system');
+});
+
+test('state discovery excludes comments, static strings, shadowed globals and unrelated regular expressions', () => {
+  const records = analyzeState(
+    '// ?fake=0|1\n' +
+    'const sample = "?example=0"; sample.match(/example=(0|1)/);' +
+    'function f(window) { const p = new URLSearchParams(window.location.search); p.get("fake"); }' +
+    'function g(URLSearchParams) { new URLSearchParams(location.search).get("fake2"); }' +
+    'const p = new URLSearchParams(location.search); const orphan=p.get("real");');
+  assert.deepEqual(records.map(item => item.name), ['real']);
+  assert.equal(records[0].impact, 'unknown');
+});
+
+test('state analysis does not confuse member names with independent template identifiers', () => {
+  const [record] = analyzeState('const params = new URLSearchParams(location.search); const booked=params.get("booked");', {
+    bindings: [{ element: 'span', expression: 'other.booked', families: ['A'] }],
+  });
+  assert.equal(record.impact, 'unknown');
+});
+
+test('parameter extraction sources exclude unrelated later calls and do not execute source', () => {
+  const [record] = analyzeState('const p = new URLSearchParams(location.search);\nconst heat = p.get("heat");\nNumber(heat);\nthrow new Error("must not run");');
+  assert.deepEqual(record.sources, ['js/state.js:2']);
+});
+
+test('runtime parameter values from other pages are not counted as configured states', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<span class="a">甲</span><script>const params=new URLSearchParams(location.search); const booked=params.get("booked"); if(booked==="1") {}</script>');
+  fs.writeFileSync(path.join(root, 'dist', 'other.html'), '<span>其他</span>');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ mikit: { font: { pages: ['http://example.test/other.html?booked=1'] } } }));
+  const result = subsetFonts({ projectDir: root, runtimeRunner() { return {}; }, commandRunner(_command, args) {
+    fs.writeFileSync(args.find(arg => arg.startsWith('--output-file=')).slice(14), 'subset');
+    return { status: 0 };
+  } });
+  const markdown = fs.readFileSync(result.report, 'utf8');
+  const section = markdown.split('## 页面状态参数')[1].split('## 采集详情')[0];
+  assert.match(section, /未显式配置该参数；未显式配置取值：1/);
+  assert.doesNotMatch(section, /已配置取值：1/);
+});
+
+
+test('state discovery inspects referenced local modules without unrelated script files', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'),
+    '<span class="a" v-text="mode === \'rules\' ? \'规则\' : \'首页\'"></span>' +
+    '<script type="module" src="entry.js"></script>');
+  fs.writeFileSync(path.join(root, 'dist', 'entry.js'), 'import { mode } from "./state.js"; new Vue({data:{mode}});');
+  fs.writeFileSync(path.join(root, 'dist', 'state.js'),
+    'const params = new URLSearchParams(location.search); export const mode = params.get("dialog"); if(mode === "rules") {}');
+  fs.writeFileSync(path.join(root, 'dist', 'unused.js'), 'new URLSearchParams(location.search).get("unused");');
+  const result = subsetFonts({ projectDir: root, commandRunner(_command, args) {
+    fs.writeFileSync(args.find(arg => arg.startsWith('--output-file=')).slice(14), 'subset');
+    return { status: 0 };
+  } });
+  const markdown = fs.readFileSync(result.report, 'utf8');
+  const section = markdown.split('## 页面状态参数')[1].split('## 采集详情')[0];
+  assert.match(section, /dialog.*rules.*可能影响本地字体.*A/);
+  assert.match(section, /state.js:1/);
+  assert.doesNotMatch(section, /unused/);
+});
+
+
+test('state analysis reuses shared dependencies without exponential expansion', () => {
+  const declarations = ['const params = new URLSearchParams(location.search);', 'let state0 = params.get("booked");'];
+  for (let index = 1; index <= 24; index++) {
+    declarations.push('let state' + index + ' = state' + (index - 1) + ' + state' + (index - 1) + ';');
+  }
+  declarations.push('if (state24 === "1") {}');
+  const originalHas = Set.prototype.has;
+  let operations = 0;
+  let records;
+  try {
+    Set.prototype.has = function (value) {
+      if (++operations > 50000) throw new Error('shared dependency analysis exceeded its work budget');
+      return Reflect.apply(originalHas, this, [value]);
+    };
+    records = analyzeState(declarations.join('\n'), {
+      bindings: [{ element: 'span', expression: 'state24', families: ['A'] }],
+    });
+  } finally {
+    Set.prototype.has = originalHas;
+  }
+  assert.deepEqual(records.map(record => record.name), ['booked']);
+  assert.equal(records[0].impact, 'local');
+  assert.deepEqual(records[0].values, ['1']);
+  assert.deepEqual(records[0].sources, ['js/state.js:2']);
+});
+
+test('state analysis propagates query provenance across cycles without contaminating unrelated variables', () => {
+  const records = analyzeState('const params = new URLSearchParams(location.search);' +
+    'let a = b; let b = a; b = params.get("booked"); if (a === "1") {}' +
+    'let other = "unused"; if (other === "2") {}', {
+    bindings: [{ element: 'span', expression: 'a', families: ['A'] }],
+  });
+  assert.deepEqual(records.map(record => record.name), ['booked']);
+  assert.equal(records[0].impact, 'local');
+  assert.deepEqual(records[0].values, ['1']);
+  assert.ok(records[0].bindings.includes('a'));
+  assert.equal(records[0].bindings.includes('other'), false);
+});
+
+test('all skipped fonts still publish unresolved dynamic text risks and announce a report', (t) => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'), '<span class="a">{{apiText}}</span>');
+  const manifestDir = path.join(root, 'font');
+  fs.mkdirSync(manifestDir);
+  fs.writeFileSync(path.join(manifestDir, 'font-report.json'), 'stale');
+  const messages = [];
+  const originalLog = console.log;
+  let result;
+  try {
+    console.log = (...args) => messages.push(args.join(' '));
+    result = subsetFonts({ projectDir: root, commandRunner() { throw new Error('empty fonts must not be subset'); } });
+  } finally {
+    console.log = originalLog;
+  }
+  assert.equal(result.processed.length, 0);
+  assert.equal(result.skipped.length, 2);
+  assert.equal(result.report, path.join(manifestDir, 'font-report.md'));
+  const report = fs.readFileSync(result.report, 'utf8');
+  assert.match(report, /动态文字风险[\s\S]*apiText/);
+  assert.match(report, /index.html.*span.a.*apiText/);
+  assert.ok(messages.some(message => message.includes('请查看字体报告') && message.includes(result.report)));
+  assert.match(messages.join('\n'), /1 项动态文字风险/);
+  assert.doesNotMatch(messages.join('\n'), /apiText/);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'dist', 'font')), []);
+  assert.equal(fs.existsSync(path.join(manifestDir, 'font-report.json')), false);
+});
+
+test('risk summaries omit system-only risks when all fonts are skipped', (t) => {
+  const root = fixture(t);
+  const html = path.join(root, 'dist', 'index.html');
+  fs.writeFileSync(html, '<span style="font-family:Microsoft YaHei">{{systemText}}</span>');
+  const messages = [];
+  const originalLog = console.log;
+  try {
+    console.log = (...args) => messages.push(args.join(' '));
+    const run = () => subsetFonts({ projectDir: root, commandRunner() { throw new Error('empty fonts must not be subset'); } });
+    const systemOnly = run();
+    assert.equal(systemOnly.report, null);
+    assert.doesNotMatch(messages.join('\n'), /动态文字风险|请查看字体报告/);
+    messages.length = 0;
+    fs.appendFileSync(html, '<span class="a">{{apiText}}</span>');
+    const mixed = run();
+    assert.ok(mixed.report);
+    assert.match(messages.join('\n'), /1 项动态文字风险/);
+    assert.doesNotMatch(fs.readFileSync(mixed.report, 'utf8'), /systemText|Microsoft YaHei/);
+  } finally {
+    console.log = originalLog;
+  }
+});

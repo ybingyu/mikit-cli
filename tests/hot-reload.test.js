@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const { spawn } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
-const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-hot-reload-'));
+const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-hot-reload-distribution-'));
 const wwwroot = path.join(fixtureRoot, 'primary', 'wwwroot');
 const otherRoot = path.join(fixtureRoot, 'primary', 'wwwroot-copy');
 const dist = path.join(fixtureRoot, 'primary', 'dist');
@@ -54,6 +54,7 @@ async function verifyClient(page, initial) {
   let pendingFetch;
   let requests = 0;
   const events = {};
+  const requestUrls = [];
   const timers = new Map();
   let timerId = 0;
   const attributes = { 'data-project': 'primary', 'data-session': initial.session, 'data-modified': initial.lastModified };
@@ -70,7 +71,8 @@ async function verifyClient(page, initial) {
     document, URL,
     window: { location: { href: 'http://primary.y.bindyy.cn/', reload: () => { reloads += 1; } },
       addEventListener: (name, callback) => { events[name] = callback; } },
-    fetch: () => {
+    fetch: url => {
+      requestUrls.push(url);
       requests += 1;
       return new Promise(resolve => {
         pendingFetch = () => resolve({ ok: true, json: async () => nextStatus });
@@ -83,6 +85,7 @@ async function verifyClient(page, initial) {
   events.pageshow();
   events.visibilitychange();
   assert.equal(requests, 1, 'Lifecycle events must not overlap an in-flight heartbeat');
+  assert.ok(requestUrls[0].includes('since=' + initial.lastModified));
   await flush();
   assert.equal(reloads, 0);
   nextStatus = { ...initial, lastModified: initial.lastModified + 1, files: ['style.css'] };
@@ -90,10 +93,14 @@ async function verifyClient(page, initial) {
   await flush();
   assert.equal(styleUpdates, 1, 'CSS-only updates must retain stylesheet replacement');
   assert.equal(reloads, 0);
+  nextStatus = { ...initial, lastModified: initial.lastModified + 2, files: ['index.html', 'style.css'] };
+  events.pageshow();
+  await flush();
+  assert.equal(reloads, 1, 'Mixed HTML and CSS changes must reload the page');
   nextStatus = { ...initial, session: 'new-session' };
   events.pageshow();
   await flush();
-  assert.equal(reloads, 1, 'A resumed page must reload when its watcher session expired');
+  assert.equal(reloads, 2, 'A resumed page must reload when its watcher session expired');
   events.beforeunload();
   assert.equal(timers.size, 0);
 }
@@ -220,6 +227,12 @@ async function verifyClient(page, initial) {
     await changeSharedFile('style.css', () => fs.writeFileSync(path.join(wwwroot, 'style.css'), 'body { color: red; }'));
     await changeSharedFile('style.css', () => fs.writeFileSync(path.join(wwwroot, 'style.css'), 'body { color: green; }'));
     await changeSharedFile('style.css', () => fs.unlinkSync(path.join(wwwroot, 'style.css')));
+    await changeSharedFile('distance.js', () => fs.writeFileSync(path.join(wwwroot, 'distance.js'), 'window.distance = 1;'));
+    const batchStart = await status('primary');
+    await changeSharedFile('index.html', () => fs.writeFileSync(path.join(wwwroot, 'index.html'), 'batched page'));
+    await changeSharedFile('batch.css', () => fs.writeFileSync(path.join(wwwroot, 'batch.css'), 'body {}'));
+    const batchResponse = await request('primary', '/hot-update-status?project=primary&since=' + batchStart.lastModified);
+    assert.deepEqual(JSON.parse(batchResponse.body).files, ['index.html', 'batch.css']);
     const sharedBefore = await status('primary');
     fs.writeFileSync(path.join(otherRoot, 'index.html'), 'other changed page');
     await waitUntil(async () => (await status('other')).lastModified > otherInitial.lastModified, 'Other project must receive its own changes');

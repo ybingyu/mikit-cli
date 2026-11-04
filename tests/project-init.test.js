@@ -51,6 +51,9 @@ function testCreatesPackageJsonInCurrentDirectory() {
     });
     assert.deepEqual(packageJson.mikit, {
       author: '',
+      build: {
+        cleanKeep: []
+      },
       replace: {
         root: 'dist',
         include: ['**/*.css'],
@@ -90,6 +93,7 @@ function testCreatesPackageJsonInCurrentDirectory() {
         dynamicTextPolicy: 'warn',
         globalExtraText: '',
         familyExtraText: {},
+        generatedFamilyExtraText: {},
         familyOptions: {}
       }
     });

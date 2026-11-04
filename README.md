@@ -50,6 +50,29 @@ mikit --help
 
 `npm ci` 会严格按照 `package-lock.json` 把运行依赖安装到源码目录的 `node_modules`。`npm install -g "file:..."` 仅适合 Mikit-CLI 本身的开发或调试，它建立的是指向源码目录的全局链接，不会代替源码目录安装依赖；如果跳过 `npm ci`，运行时可能出现 `Cannot find module 'commander'`。源码修改后，全局 `mikit` 会继续指向该本地目录。
 
+### 新版本提醒
+
+在交互式终端执行 `mikit start`、`mikit build`、`mikit init` 等实际命令时，Mikit 会检查 npm 官方仓库中的最新正式版本。发现更新后，会显示当前版本、最新版本和适合当前安装方式的更新命令。例如（版本号仅作示例）：
+
+```text
+[mikit] 发现新版本：1.0.1 → 1.0.2
+[mikit] 更新命令：npm install -g mikit-cli@latest
+```
+
+- 检查结果默认缓存 24 小时；缓存有效期间不重复联网，仍会在执行命令时提示已发现的更新。
+- 每次联网检查最多等待 1 秒；断网、超时或缓存读写失败不会阻止原命令执行。检查失败的尝试也会缓存，避免离线时反复等待。
+- 全局安装显示全局更新命令；项目依赖显示对应的项目更新命令，并保留普通依赖、开发依赖或可选依赖的类别。
+- 提醒写入标准错误输出，不改变命令的标准输出。`mikit --version`、`mikit --help` 和 `mikit help` 不检查更新；CI 环境或标准错误输出未连接终端时也会跳过检查。
+- Mikit 只提示更新，不会自动安装。旧版本需要先升级到包含此功能的版本，之后才能收到提醒。
+
+如需关闭检查，可设置环境变量 `npm_config_update_notifier=false`。例如，在当前 PowerShell 会话中关闭：
+
+```powershell
+$env:npm_config_update_notifier = 'false'
+```
+
+恢复检查时执行 `Remove-Item Env:npm_config_update_notifier`，或重新打开一个未设置该变量的终端。
+
 ### 字体子集化依赖（仅字体功能需要）
 
 只有使用 `mikit build --minfont` 或 `mikit font` 时才需要 Python 依赖。字体仅生成 CSS 本地 URL 引用的 TTF、WOFF、WOFF2 格式；需要 WOFF2 时额外安装 `brotli`：
@@ -306,7 +329,7 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 
 **构建选项：**
 
-- `-o, --output <output>`：输出目录（默认：`dist`）。构建开始时会清空该输出目录。
+- `-o, --output <output>`：输出目录（默认：`dist`）。构建前默认清空该输出目录；可通过 `mikit.build.cleanKeep` 保留指定目录，详见下文。
 - `--min`：压缩 HTML、CSS、JS。
 - `--minhtml`：仅压缩 HTML。
 - `--mincss`：仅压缩 CSS。
@@ -316,6 +339,26 @@ Mikit-CLI 提供多种构建方式，适用于不同场景：
 - `--minfont`：构建后开启字体子集化；如果 `mikit.font.pages` 非空，会在同一次处理中自动访问动态 URL。
 - `--font-page <page>`：覆盖默认的 SHTML 自动扫描，指定相对构建输出目录的静态 HTML 页面或 glob，例如 `pages/*.html`、`**/*.html`。不传时会递归扫描 `wwwroot` 中所有非 `_` 开头的 `.shtml` 对应构建页面；它不用于填写动态 URL。
 - `--font-manifest <directory>`：指定字符清单 TXT 的输出目录（默认：`font`，相对项目根目录解析），不改变字体文件的输出位置。例如项目为 `D:\site` 时，默认目录是 `D:\site\font`，与 `wwwroot`、`dist` 同级；可传入 `font-manifests` 将清单输出到 `D:\site\font-manifests`。
+
+#### 构建前清理与目录保留
+
+在项目 `package.json > mikit.build.cleanKeep` 中选择清理方式。`mikit init` 默认生成 `"cleanKeep": []`；未配置或为空数组时，构建前清空整个输出目录。需要保留部分目录时，填写相对本次实际输出目录的目录路径：
+
+```json
+{
+  "mikit": {
+    "build": {
+      "cleanKeep": ["font", "img/origin"]
+    }
+  }
+}
+```
+
+此例在默认输出中保留 `dist/font` 和 `dist/img/origin`，清理其他旧内容，再正常构建。只保留 `img/origin` 时，`img` 下的其他旧文件和目录仍会被删除。使用 `mikit build --output custom-dist` 时，相同配置作用于 `custom-dist/font` 和 `custom-dist/img/origin`，无需在配置中加上输出目录前缀。上述名称仅为示例，可填写多个任意目录。
+
+保留目录在本次 `mikit build` 中保持原样：不删除、不复制或覆盖 `wwwroot` 对应目录中的文件，也不编译或压缩这些文件。构建内的 `--minfont` 和 `--png` 同样跳过保留目录；字体扫描也不读取其中的 HTML、CSS 或脚本，动态字体采集会跳过映射到保留目录的页面。保留 `font/vendor` 这类字体子目录时，该子目录不参与字体清理和替换，其他字体照常处理。
+
+配置项必须是非空的相对目录路径，支持 `/` 或 JSON 中转义后的 `\\`；不支持绝对路径、`..`、`*` 或 `?` 通配符，也不能指向文件。保留路径及其目录树不能含符号链接或 Windows 目录联接。不存在的目录允许配置；对应源码仍会跳过，不会从 `wwwroot` 创建该保留目录。配置和相关路径检查通过后才会清理输出。此配置只影响 `mikit build` 及其内置处理；独立执行 `mikit font`、`mikit png`、`mikit replace` 或 `mikit pack` 时仍按各自配置处理，串联这些命令的 npm 脚本也可能继续修改保留目录。
 
 #### 构建作者注释
 
@@ -567,6 +610,9 @@ npm run sync:svn
   },
   "mikit": {
     "author": "项目作者(工号)",
+    "build": {
+      "cleanKeep": []
+    },
     "replace": {
       "root": "dist",
       "include": ["**/*.css"],
@@ -776,7 +822,8 @@ project/
     "build:minify-css": "mikit build --mincss"
   },
   "mikit": {
-    "author": "项目作者(工号)"
+    "author": "项目作者(工号)",
+    "build": { "cleanKeep": [] }
   },
   "devDependencies": {
     "mikit-cli": "file:../mikit-cli"

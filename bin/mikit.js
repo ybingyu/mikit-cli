@@ -199,13 +199,22 @@ program
     program.outputHelp();
   });
 
-// 解析命令行参数
-program.parse(process.argv);
+// 实际执行命令前检查更新；帮助和版本输出保持原样。
+program.hook('preAction', async (_program, command) => {
+  if (command.name() !== 'help') {
+    await require('../lib/update-notifier').notifyUpdate();
+  }
+});
 
-// 如果没有指定命令，显示帮助
-if (!program.args.length) {
-  program.outputHelp();
-}
+// 解析命令行参数，等待异步命令钩子完成。
+program.parseAsync(process.argv).then(() => {
+  if (!program.args.length) {
+    program.outputHelp();
+  }
+}).catch(error => {
+  console.error('[mikit] ' + error.message);
+  process.exitCode = 1;
+});
 
 function runWorkflowCommand(name, action) {
   try {

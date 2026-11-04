@@ -4,7 +4,8 @@ const { EventEmitter } = require('node:events');
 
 const {
   attachWatcherErrorHandler,
-  createAutoWatchIgnored
+  createAutoWatchIgnored,
+  createSourceWatchIgnored
 } = require('../lib/watcher-safety');
 
 const watchRoot = path.resolve('F:\\NDW\\【魔域】\\2026');
@@ -32,6 +33,16 @@ assert.equal(ignored(path.join(projectRoot, 'node_modules', 'pkg', 'index.js')),
 assert.equal(ignored(path.join(projectRoot, '.git', 'index')), true);
 assert.equal(ignored(path.join(projectRoot, '.svn', 'wc.db')), true);
 assert.equal(ignored(path.resolve(watchRoot, '..', 'dist', 'outside.png')), false);
+
+const sourceRoot = path.resolve('distribution', 'my-node_modules-tools', 'wwwroot');
+const virtualRoot = path.join(sourceRoot, 'vendor');
+const sourceIgnored = createSourceWatchIgnored(sourceRoot, { '/vendor': virtualRoot });
+for (const file of ['', 'distance.js', 'css/district.css', 'my-node_modules-notes.txt', 'vendor-copy/app.js']) {
+  assert.equal(sourceIgnored(path.join(sourceRoot, file)), false, file);
+}
+for (const file of ['dist', 'dist/app.js', 'nested/node_modules/pkg/index.js', 'vendor', 'vendor/app.js']) {
+  assert.equal(sourceIgnored(path.join(sourceRoot, file)), true, file);
+}
 
 const watcher = new EventEmitter();
 const warnings = [];

@@ -162,7 +162,28 @@ When the user enables Autoprefixer during initialization:
 - `--minfont`: subset local fonts after building. By default, recursively discover `wwwroot/**/*.shtml`, exclude files whose basename starts with `_`, and scan their same-path `.html` build outputs.
 - `--font-page <page>`: override the default static SHTML discovery with an output-relative HTML file or glob. It is not a dynamic URL option.
 
-The build replaces its output directory. Do not put manually maintained source files there.
+The build clears its output directory by default. Use `mikit.build.cleanKeep` only when selected output directories should survive cleanup, and keep manually maintained source files in `wwwroot`.
+
+### Build Output Cleanup
+
+Configure this in the consumer project's `package.json`:
+
+```json
+{
+  "mikit": {
+    "build": {
+      "cleanKeep": ["font", "img/origin"]
+    }
+  }
+}
+```
+
+- Missing `mikit.build`, missing `cleanKeep`, or `cleanKeep: []` clears the entire output as before. `mikit init` emits `build: { cleanKeep: [] }`.
+- Entries are explicit directory paths relative to the actual output: this example preserves `dist/font` and `dist/img/origin`, or `custom-dist/font` and `custom-dist/img/origin` with `--output custom-dist`. The names are examples; use the user's confirmed directories. Multiple directories and nested paths are supported.
+- Only listed directories and their necessary parents survive cleanup. Preserving `img/origin` does not preserve other files or directories under `img`. Duplicate and overlapping entries are accepted; a preserved parent includes its whole tree. Windows path matching is case insensitive.
+- Preserved trees remain unchanged throughout `mikit build`. Matching source trees are not copied, compiled, minified, or overwritten. Integrated `--minfont` and `--png` processing skips these trees; font analysis excludes their HTML, CSS, scripts, and mapped runtime pages. A kept `font/vendor` subtree is neither staged nor replaced while other fonts can still be processed.
+- Use `/` or escaped `\\` in JSON. The value must be an array of nonempty relative directory paths, with no absolute paths, `..`, `*`, or `?`. Existing paths must point to directories; symbolic links and Windows junctions are rejected in preserved paths and their trees. Invalid configuration or paths fail before cleanup.
+- Missing directories are allowed; matching source trees are also skipped, so the build does not populate the kept directory. The setting affects only `mikit build` and its integrated processing. Independent `mikit font`, `mikit png`, `mikit replace`, and `mikit pack` commands retain their configured scope, including when chained in an npm script.
 
 ### Build Attribution Header
 
@@ -207,6 +228,7 @@ Dynamic collection is separate and supplements static results. Configure rendere
       "dynamicTextPolicy": "warn",
       "globalExtraText": "",
       "familyExtraText": {},
+      "generatedFamilyExtraText": {},
       "familyOptions": {}
     }
   }
@@ -220,13 +242,14 @@ Dynamic collection is separate and supplements static results. Configure rendere
 - `browserExecutable`: optional browser executable path; omit it to use supported local Chrome/Edge discovery.
 - `asciiBaseline`: `none` by default (only observed/explicit characters); `common` adds common digits and punctuation; `full` adds ASCII 32–126.
 - `globalExtraText`: characters explicitly added to all font families.
-- `familyExtraText`: CSS `font-family` keyed strings for family-specific additions.
+- `familyExtraText`: user-owned CSS `font-family` keyed strings for family-specific additions. Preserve existing values, including those configured before generated supplements were supported.
+- `generatedFamilyExtraText`: optional Skill-managed strings keyed by CSS `font-family`, defaulting to `{}`. Mikit combines these with collected text, global supplements, user supplements, and the ASCII baseline, deduplicating Unicode characters. It does not edit configuration or infer obsolete text. The Skill refreshes generated entries only with sufficient source evidence; user supplements are not migrated or deleted. Both per-family maps apply to all weights and styles of the family.
 - `familyOptions`: CSS `font-family` keyed objects such as `{ "Title": { "asciiBaseline": "common" } }`.
 - `dynamicTextPolicy`: `warn` by default for unresolved text; `error` stops publication when such risks occur.
 
 Successful operations print the full path to the Markdown report, `font/font-report.md` by default; a custom manifest directory also determines the report location. Markdown replaces the former JSON report, while complete character lists remain in TXT files. Read “结果概览” for totals and “待处理事项” for source-font gaps, unresolved dynamic copy, digit coverage to confirm, and fonts whose validation did not run. “字体明细” lists deduplicated character-source counts, the effective ASCII policy, validation, TXT links, and per-format files, sizes, and reductions; a missing original file of the same format is marked as not comparable. “扫描来源与覆盖边界” lists scanned pages: omitting `pages` means no browser DOM collection, and configured pages cover only observed states.
 
-Uncollected digits do not establish actual missing glyphs. Default `asciiBaseline: "none"` does not auto-add digits. Confirm runtime states before adding explicit `pages`, per-family `familyExtraText`, or opting in to `familyOptions.<family>.asciiBaseline: "common"`; rerun and check the report and pages. Source-font gaps require a suitable replacement or fallback font; adding text cannot create glyphs absent from the original font. Unperformed validation must not be treated as a pass. Font generation, character lists, and report publication are staged and rolled back together on failure. Successful publication removes the old JSON report; an operation with no effective fonts produces no report and removes stale reports.
+Uncollected digits do not establish actual missing glyphs. Default `asciiBaseline: "none"` does not auto-add digits. For authorized font work, follow [dynamic font analysis](dynamic-fonts.md): maintain per-family digits in generatedFamilyExtraText when source evidence proves a changing numeric display and its font; ask only when content, font ownership, or required URLs remain unknown. Preserve existing ASCII settings and rerun to check the report and pages. Source-font gaps require a suitable replacement or fallback font; adding text cannot create glyphs absent from the original font. Unperformed validation must not be treated as a pass. Font generation, character lists, and report publication are staged and rolled back together on failure. Successful publication removes the old JSON report; an operation with no effective fonts produces no report and removes stale reports.
 
 Font operations require `fonttools`; Brotli is needed when CSS references WOFF2. Mikit recursively scans built `**/*.css` under the output directory (including `scss/`) and built HTML `<style>` blocks, not source SCSS. After collection, it keeps only fonts locally referenced by CSS with at least one extracted character, and only the TTF, WOFF, or WOFF2 formats referenced for each font. A WOFF-only declaration requires an original WOFF file; missing usable input is reported with its path before fonts are removed. Unreferenced and zero-character fonts are removed. Dynamic URL collection additionally requires a reachable local page and Chrome or Edge.
 

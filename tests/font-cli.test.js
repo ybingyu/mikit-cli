@@ -197,3 +197,62 @@ test('font CLI validates distinct real subsets for same-family weights and clean
   for (const [name, source] of Object.entries(sources)) assert.deepEqual(
     fs.readFileSync(path.join(root, 'wwwroot/font', name + '.ttf')), fs.readFileSync(path.join('C:/Windows/Fonts', source)));
 });
+
+
+test('font CLI reads generated supplements from package.json and preserves manual characters across updates', (t) => {
+  const original = 'C:/Windows/Fonts/arial.ttf';
+  if (!fs.existsSync(original)) { t.skip('Arial fixture unavailable'); return; }
+  if (spawnSync('pyftsubset', ['--help'], { windowsHide: true }).error) {
+    t.skip('pyftsubset unavailable'); return;
+  }
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-generated-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'wwwroot', 'font'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'dist', 'font'), { recursive: true });
+  fs.copyFileSync(original, path.join(root, 'wwwroot', 'font', 'title.ttf'));
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'), '<span class="title">X</span>');
+  fs.writeFileSync(path.join(root, 'dist', 'site.css'), '@font-face{font-family:Title;src:url(font/title.woff2)}.title{font-family:Title}');
+  const run = (generated) => {
+    const config = JSON.stringify({ mikit: { font: { familyExtraText: { Title: 'aU' },
+      ...(generated === undefined ? {} : { generatedFamilyExtraText: { Title: generated } }) } } });
+    fs.writeFileSync(path.join(root, 'package.json'), config);
+    const result = spawnSync(process.execPath, [cliPath, 'font'], { cwd: root, encoding: 'utf8', windowsHide: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /\[mikit font\] 请查看字体报告：/);
+    assert.doesNotMatch(result.stderr, /源字体缺少/);
+    assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), config);
+    assert.match(fs.readFileSync(path.join(root, 'font', 'font-report.md'), 'utf8'), /字体文件验证通过/);
+    return fs.readFileSync(path.join(root, 'font', 'title.txt'), 'utf8');
+  };
+  assert.equal(run('abc'), 'XaUbc');
+  assert.equal(run('1723'), 'XaU1723');
+  assert.equal(run(), 'XaU');
+  const invalid = JSON.stringify({ mikit: { font: { generatedFamilyExtraText: { Title: 123 } } } });
+  fs.writeFileSync(path.join(root, 'package.json'), invalid);
+  const failed = spawnSync(process.execPath, [cliPath, 'font'], { cwd: root, encoding: 'utf8', windowsHide: true });
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /^\[mikit font\].*generatedFamilyExtraText/m);
+  assert.doesNotMatch(failed.stderr, /\n\s+at /);
+  assert.equal(fs.readFileSync(path.join(root, 'font', 'title.txt'), 'utf8'), 'XaU');
+});
+
+
+test('font CLI reports dynamic risks even when every font has zero collected characters', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-font-empty-risk-cli-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'dist', 'font'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'wwwroot', 'font'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'wwwroot', 'font', 'title.ttf'), 'unused original font');
+  fs.writeFileSync(path.join(root, 'dist', 'font', 'title.ttf'), 'stale subset');
+  fs.writeFileSync(path.join(root, 'dist', 'index.html'), '<span class="title">{{apiText}}</span>');
+  fs.writeFileSync(path.join(root, 'dist', 'site.css'), '@font-face{font-family:Title;src:url(font/title.ttf)}.title{font-family:Title}');
+  const result = spawnSync(process.execPath, [cliPath, 'font'], { cwd: root, encoding: 'utf8', windowsHide: true });
+  assert.equal(result.status, 0, result.stderr);
+  const report = path.join(root, 'font', 'font-report.md');
+  assert.match(result.stdout, /0 个已压缩，1 个已跳过/);
+  assert.match(result.stdout, /1 项动态文字风险/);
+  assert.ok(result.stdout.includes(report));
+  assert.doesNotMatch(result.stdout + result.stderr, /apiText/);
+  assert.match(fs.readFileSync(report, 'utf8'), /动态文字风险[\s\S]*apiText/);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'dist', 'font')), []);
+});
