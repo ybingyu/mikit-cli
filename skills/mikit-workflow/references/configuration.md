@@ -278,7 +278,7 @@ During initialization, always give the user an explicit choice between keeping `
 
 `quantize` reduces the PNG palette and is lossy even at 256 colors. Use it when smaller files are preferred and verify representative gradients and transparent edges. Use `lossless` when decoded pixels must remain identical. In both modes, Mikit only replaces a file when the result is smaller.
 
-## CSS Replacement
+## Built Text Replacement
 
 ```json
 {
@@ -288,6 +288,7 @@ During initialization, always give the user an explicit choice between keeping `
       "include": ["**/*.css"],
       "rules": [
         {
+          "include": ["**/*.css"],
           "from": "../img/",
           "to": {
             "development": "https://img.example.test/development/",
@@ -301,15 +302,15 @@ During initialization, always give the user an explicit choice between keeping `
 ```
 
 - `root`: replacement root, default `dist`.
-- `include`: CSS glob patterns.
-- `rules`: ordered literal replacements.
+- Top-level `include`: glob patterns relative to `root`, default `['**/*.css']`. Existing explicit CSS-only configurations remain CSS-only. Add `**/*.html`, `**/*.shtml`, `**/*.js`, or `**/*.vue` only when those text types are requested.
+- `rules`: ordered literal replacements. Per-rule `include` narrows the top-level selection; omitting it applies the rule to all top-level selected files. A rule cannot select files outside the top-level scope.
 - `disabled: true`: skip a rule.
 - `env`: optional string or array limiting a rule to `NODE_ENV` values.
 - `to`: a string or an environment map with an applicable key or `default`.
 
 The generated scripts use `NODE_ENV=development` for `replace:dev` and `NODE_ENV=production` for `replace:build`, so a two-environment address map normally uses `development` and `production`. If every environment shares the same destination, use one string instead. If an environment map needs a fallback for additional environment names, add `default` explicitly.
 
-Only matched CSS files are processed. Replacement is literal, ordered, and in place.
+For example, with top-level `include: ["**/*.css", "**/*.shtml"]`, use a CSS rule with `include: ["**/*.css"]` and `from: "../img/"`, and an SHTML rule with `include: ["**/*.shtml"]` and `from: "img/"`. HTML, JS, and Vue follow the same explicit-selection pattern. Only selected valid UTF-8 text files are processed; accidental binary matches fail. Replacement is literal, ordered, and in place on built files.
 
 ## Go Template Packing
 

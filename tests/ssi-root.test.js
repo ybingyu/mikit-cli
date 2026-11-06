@@ -6,6 +6,45 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
+const activeRootIncludes = [
+  '<!--#include virtual="/include/_pop.shtml" -->',
+  '<!--# include virtual="/include/_pop.shtml" -->',
+  '<!--#\tinclude virtual="/include/_pop.shtml" -->',
+  '<!--#\ninclude virtual="/include/_pop.shtml" -->',
+  '<!--#include virtual="/include/_pop.shtml"-->'
+];
+const activeRelativeIncludes = [
+  '<!--#include virtual="include/_relative.shtml" -->',
+  '<!--# include virtual="include/_relative.shtml" -->',
+  '<!--#include file="include/_relative.shtml"-->',
+  '<!--# include file="include/_relative.shtml" -->'
+];
+const inactiveIncludes = [
+  '<!-- #include virtual="/include/_pop.shtml" -->',
+  '<!-- #include virtual="include/_relative.shtml" -->',
+  '<!-- # include virtual="/include/_pop.shtml" -->',
+  '<!-- # include virtual="include/_relative.shtml" -->',
+  '<!--\t#include virtual="/include/_pop.shtml" -->',
+  '<!--\n#include virtual="/include/_pop.shtml" -->',
+  '<!--include virtual="/include/_pop.shtml" -->',
+  '<!--include virtual="include/_relative.shtml" -->',
+  '<!-- #include file="include/_relative.shtml" -->',
+  '<!-- # include file="include/_relative.shtml" -->',
+  '<!--include file="include/_relative.shtml" -->'
+];
+const nestedInactiveInclude = '<!-- #include virtual="/include/_pop.shtml"-->';
+
+function assertSSIContent(content) {
+  assert.equal((content.match(/<span>root include<\/span>/g) || []).length,
+    activeRootIncludes.length + activeRelativeIncludes.length);
+  assert.equal((content.match(/<span>relative include<\/span>/g) || []).length,
+    activeRelativeIncludes.length);
+  for (const comment of inactiveIncludes) {
+    assert.ok(content.includes(comment), 'Should preserve comment: ' + comment);
+  }
+  assert.equal(content.split(nestedInactiveInclude).length - 1, activeRelativeIncludes.length);
+  assert.doesNotMatch(content, /<!--#\s*include\s+(?:virtual|file)=/);
+}
 
 function request(port, pathname) {
   return new Promise((resolve, reject) => {
@@ -66,14 +105,17 @@ function createFixture() {
   fs.mkdirSync(include, { recursive: true });
   fs.mkdirSync(pageInclude, { recursive: true });
   fs.writeFileSync(path.join(include, '_pop.shtml'), '<span>root include</span>');
-  fs.writeFileSync(path.join(pageInclude, '_relative.shtml'), '<span>relative include</span>');
+  fs.writeFileSync(
+    path.join(pageInclude, '_relative.shtml'),
+    '<span>relative include</span>' + nestedInactiveInclude +
+      '<!--# include virtual="/include/_pop.shtml"-->'
+  );
   fs.writeFileSync(
     path.join(pages, 'index.shtml'),
     '<main>' +
-      '<!--#include virtual="/include/_pop.shtml" -->' +
-      '<!--# include virtual="/include/_pop.shtml" -->' +
-      '<!--include virtual="/include/_pop.shtml" -->' +
-      '<!--#include virtual="include/_relative.shtml" -->' +
+      activeRootIncludes.join('') +
+      inactiveIncludes.join('') +
+      activeRelativeIncludes.join('') +
       '</main>'
   );
 
@@ -132,8 +174,7 @@ function removeFixture(fixtureRoot) {
       path.join(fixtureRoot, 'dist', 'pages', 'index.html'),
       'utf8'
     );
-    assert.equal((builtPage.match(/<span>root include<\/span>/g) || []).length, 3);
-    assert.equal((builtPage.match(/<span>relative include<\/span>/g) || []).length, 1);
+    assertSSIContent(builtPage);
 
     fs.writeFileSync(serverScript, `
 process.chdir(${JSON.stringify(fixtureRoot)});
@@ -154,9 +195,7 @@ require(${JSON.stringify(path.join(repoRoot, 'lib', 'server'))}).start({
 
     const response = await request(port, '/pages/index.shtml');
     assert.equal(response.statusCode, 200);
-    assert.equal((response.body.match(/<span>root include<\/span>/g) || []).length, 3);
-    assert.equal((response.body.match(/<span>relative include<\/span>/g) || []).length, 1);
-    assert.doesNotMatch(response.body, /<!--\s*#?\s*include\s+(?:virtual|file)=/);
+    assertSSIContent(response.body);
   } finally {
     if (child) {
       await stopServer(child);

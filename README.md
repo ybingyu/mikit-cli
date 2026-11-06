@@ -127,7 +127,7 @@ Skill 会先检查项目和配置，缺少必要路径、地址或运行环境�
 | `mikit build` | 从 `wwwroot` 构建生产文件；例如 `mikit build --mincss`（压缩 CSS）、`mikit build --mincss --minfont`（同时处理字体）、`mikit build --output custom-dist --png`（自定义输出并压缩 PNG） |
 | `mikit font` | 直接处理已有构建输出中的本地字体 |
 | `mikit png` | 按 `mikit.png` 配置压缩 PNG；默认使用 Imagine 风格的 256 色量化，也可切换严格无损 |
-| `mikit replace` | 按 `mikit.replace` 配置替换构建后 CSS 内容 |
+| `mikit replace` | 按 `mikit.replace` 配置替换构建后选中的文本文件；默认仅 CSS |
 | `mikit pack` | 按 `mikit.pack` 配置打包 SHTML 和资源 |
 | `mikit sync-svn` | 按 `mikit.syncSvn` 配置同步 CSS 到 SVN 工作副本 |
 
@@ -146,8 +146,8 @@ mikit init
 - 固定生成构建、PNG 压缩、替换、打包和 SVN 同步所需的 12 个 npm scripts。
 - `mikit.author` 作者配置，以及 `mikit.replace`、`mikit.pack`、`mikit.syncSvn`、`mikit.png`、`mikit.font` 基础配置。
 - `mikit.author` 默认是空字符串；填写后作为项目原作者。未填写时，`mikit build` 会尝试使用全局 alias 配置中的 `author` 作为作者。
-- CSS 文件配置默认使用 `include: ["**/*.css"]` 和 `files: ["*"]`。
-- `replace.rules` 默认包含一条 `disabled: false` 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
+- `replace.include` 默认使用 `["**/*.css"]`；`syncSvn.files` 默认使用 `["*"]`，仍只同步 CSS。
+- `replace.rules` 默认包含一条 `disabled: false` 且限定 CSS 的资源地址替换示例，该规则会执行；请按项目修改示例地址。如果暂时不执行，可将 `disabled` 改为 `true`。
 - `syncSvn.targets` 默认是空数组，需填写一个或多个项目对应的 SVN CSS 目录后才能执行 `mikit sync-svn`。
 - `mikit.png` 默认生成 `mode: "quantize"` 和 `colors: 256`；如需原有严格无损压缩，改为 `mode: "lossless"`。
 
@@ -520,6 +520,18 @@ mikit font --font-page "**/*.html" --font-manifest "font-manifests"
 - `<!--#include virtual="path" -->`
 - `<!--#include file="path" -->`
 
+开发服务（`mikit start` / `mikit serve`）和构建（`mikit build`）使用相同的 include 写法：`<!--` 与 `#` 必须紧贴，`#` 与 `include` 之间允许空白。打包（`mikit pack`）转换 `virtual` 引用时也遵循这一空格规则。需要临时停用某个引用时，在 `<!--` 与 `#` 之间加一个空格：
+
+```html
+<!--#include virtual="include/_popsm.shtml" -->
+<!--# include virtual="include/_popsm.shtml" -->
+<!-- #include virtual="include/_popsm.shtml" -->
+```
+
+前两行会读取并展开文件；第三行按普通 HTML 注释处理，不读取文件。`<!-- # include ... -->` 和 `<!--include ... -->` 也按普通注释处理。停用写法在开发服务、未压缩 HTML 的构建结果和打包结果中原样保留；启用 HTML 压缩时，可能随普通注释一起删除，但不会展开引用内容。
+
+路径是否以 `/` 开头只影响文件定位，不用于停用 SSI：以 `/` 开头时从当前项目 `wwwroot` 根目录解析；相对路径从包含它的页面或 include 文件所在目录解析。
+
 ### 2. SCSS 编译
 - 自动将 SCSS 文件编译为 CSS
 - 支持 `_` 前缀的部分文件（不会单独编译）
@@ -619,6 +631,7 @@ npm run sync:svn
       "rules": [
         {
           "disabled": false,
+          "include": ["**/*.css"],
           "from": "../img/",
           "to": "https://img9.99.com/my/activity/example/"
         },
@@ -695,11 +708,27 @@ npm run sync:svn
 
 ### `mikit replace`
 
-- 只处理 `include` 命中的 CSS 文件，规则按数组顺序执行。
+- 顶层 `include` 选择 `root` 下要处理的文件；未配置时默认 `["**/*.css"]`，已有项目明确配置的 CSS-only 范围不会自动扩大。要处理 `.html`、`.shtml`、`.js` 或 `.vue` 等文本文件，须在顶层显式加入对应 glob。命中的文件必须是有效的 UTF-8 文本，命中二进制文件会报错；替换会原地修改构建输出。
+- 每条规则可配置自己的 `include`，仅作用于顶层和规则级范围的交集；省略规则级 `include` 时，使用整个顶层范围。规则按数组顺序执行。
 - `from` 使用普通字符串全量替换，不需要编写正则表达式。
 - `to` 可以是字符串，也可以是环境对象；优先读取当前 `NODE_ENV`，没有对应项时使用 `default`。
 - 规则配置 `disabled: true` 时会直接跳过；删除 `disabled` 或改为 `false` 后才会参与替换。`env` 只在对应环境执行，也可以配置成环境名称数组。
-- 下列情况会跳过：规则设置了 `disabled: true`、规则的 `env` 与当前环境不一致、CSS 文件未命中 `include`，或执行全部有效规则后文件内容没有变化。
+- 下列情况会跳过：规则设置了 `disabled: true`、规则的 `env` 与当前环境不一致、文件未命中顶层或规则级 `include`，或执行全部有效规则后文件内容没有变化。
+
+例如 CSS 中是 `../img/`，SHTML 中是 `img/`，需分别限定规则：
+
+```json
+"replace": {
+  "root": "dist",
+  "include": ["**/*.css", "**/*.shtml"],
+  "rules": [
+    { "include": ["**/*.css"], "from": "../img/", "to": "https://assets.example.test/img/" },
+    { "include": ["**/*.shtml"], "from": "img/", "to": "https://assets.example.test/img/" }
+  ]
+}
+```
+
+如需 HTML、JS 或 Vue，同样在顶层加入 `"**/*.html"`、`"**/*.js"` 或 `"**/*.vue"`，再按实际路径配置对应规则。仅添加规则级范围不会扩大顶层选中的文件。
 
 ### `mikit pack`
 

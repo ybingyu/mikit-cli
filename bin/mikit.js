@@ -96,17 +96,17 @@ program
     });
   });
 
-// 替换构建后 CSS 资源地址
+// 按配置替换构建后的文本资源
 program
   .command('replace')
-  .description('Replace built CSS assets using package.json mikit.replace config')
+  .description('Replace built text assets using package.json mikit.replace config')
   .action(() => {
     runWorkflowCommand('replace', () => {
-      const { replaceCssAssets } = require('../lib/css-replacer');
-      const summary = replaceCssAssets({ projectDir: process.cwd() });
+      const { replaceAssets } = require('../lib/css-replacer');
+      const summary = replaceAssets({ projectDir: process.cwd() });
       console.log(
         '[mikit replace] 完成：处理 ' + summary.files +
-        ' 个 CSS，更新 ' + summary.changed + ' 个，环境 ' + summary.env + '。'
+        ' 个文件，更新 ' + summary.changed + ' 个，环境 ' + summary.env + '。'
       );
     });
   });

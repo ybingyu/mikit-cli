@@ -178,6 +178,44 @@ function testSuccessfulCommands() {
   }
 }
 
+function testReplaceTextFiles() {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-replace-cli-'));
+  try {
+    write(path.join(fixtureDir, 'package.json'), JSON.stringify({
+      mikit: {
+        replace: {
+          include: ['**/*.css', '**/*.shtml', '**/*.js'],
+          rules: [
+            { include: ['**/*.css'], from: '../img/', to: 'https://css.example/' },
+            { include: ['**/*.shtml'], from: 'img/', to: 'https://page.example/' },
+            { from: 'HOST', to: 'production.example', env: 'production' }
+          ]
+        }
+      }
+    }));
+    write(path.join(fixtureDir, 'dist', 'style.css'), '../img/a.png HOST');
+    write(path.join(fixtureDir, 'dist', 'index.shtml'), '<img src="img/a.png"> HOST');
+    write(path.join(fixtureDir, 'dist', 'app.js'), '"img/a.png"; "HOST"');
+
+    const result = run('replace', fixtureDir, { NODE_ENV: 'production' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /\[mikit replace\] 完成：处理 3 个文件，更新 3 个/);
+    assert.equal(fs.readFileSync(path.join(fixtureDir, 'dist', 'style.css'), 'utf8'), 'https://css.example/a.png production.example');
+    assert.equal(fs.readFileSync(path.join(fixtureDir, 'dist', 'index.shtml'), 'utf8'), '<img src="https://page.example/a.png"> production.example');
+    assert.equal(fs.readFileSync(path.join(fixtureDir, 'dist', 'app.js'), 'utf8'), '"img/a.png"; "production.example"');
+
+    write(path.join(fixtureDir, 'package.json'), JSON.stringify({
+      mikit: { replace: { include: ['**/*.css'], rules: [{ include: [], from: 'a', to: 'b' }] } }
+    }));
+    const invalid = run('replace', fixtureDir);
+    assert.equal(invalid.status, 1, invalid.stderr);
+    assert.match(invalid.stderr, /\[mikit replace\].*mikit\.replace\.rules\[\]\.include/);
+    assert.doesNotMatch(invalid.stderr, /\n\s+at\s/);
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+}
+
 function testSuccessfulPngCommand() {
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mikit-png-cli-success-'));
   const pixels = Buffer.alloc(32 * 32 * 4);
@@ -221,4 +259,5 @@ function testSuccessfulPngCommand() {
 
 testHelpAndMissingConfig();
 testSuccessfulCommands();
+testReplaceTextFiles();
 testSuccessfulPngCommand();

@@ -60,6 +60,7 @@ function testCreatesPackageJsonInCurrentDirectory() {
         rules: [
           {
             disabled: false,
+            include: ['**/*.css'],
             from: '../img/',
             to: 'https://img9.99.com/my/activity/example/'
           }
